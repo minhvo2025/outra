@@ -1,6 +1,6 @@
 // ── Storage Keys ──────────────────────────────────────────────
 const STORAGE_KEY = 'warlock_mvp_leaderboard_v1';
-const PROFILE_KEY = 'warlock_mvp_profile_v13';
+const PROFILE_KEY = 'warlock_mvp_profile_v14';
 
 // ── Device Detection ──────────────────────────────────────────
 const isTouchDevice = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 900;
@@ -41,6 +41,12 @@ const SPELL_DEFS = {
     icon: '🛡️',
     cooldownKey: 'shieldReadyAt',
   },
+  charge: {
+    id: 'charge',
+    name: 'Arcane Charge',
+    icon: '⚡',
+    cooldownKey: 'chargeReadyAt',
+  },
 };
 
 // ── Store Items ───────────────────────────────────────────────
@@ -59,11 +65,11 @@ const storeItems = [
 // ── Keybinds ──────────────────────────────────────────────────
 const defaultBinds = {
   up: 'w', down: 's', left: 'a', right: 'd',
-  hook: 'e', teleport: 'space', shield: 'q', reset: 'r', menu: 'escape'
+  hook: 'e', teleport: 'space', shield: 'q', charge: 'f', reset: 'r', menu: 'escape'
 };
 const bindLabels = {
   up: 'Move Up', down: 'Move Down', left: 'Move Left', right: 'Move Right',
-  hook: 'Hook', teleport: 'Teleport', shield: 'Shield', reset: 'Reset Round', menu: 'Menu'
+  hook: 'Hook', teleport: 'Teleport', shield: 'Shield', charge: 'Arcane Charge', reset: 'Reset Round', menu: 'Menu'
 };
 
 let keybinds = { ...defaultBinds };
@@ -112,16 +118,17 @@ const dummySpawn  = { x: 0, y: 0 };
 // ── Player ────────────────────────────────────────────────────
 const player = {
   name: 'Player', x: 0, y: 0, vx: 0, vy: 0, r: 18, speed: 280, hp: 100, maxHp: 100,
-  fireCooldown: 0.45, hookCooldown: 1.8, teleportCooldown: 2.5, shieldCooldown: 4.5,
-  fireReadyAt: 0, hookReadyAt: 0, teleportReadyAt: 0, shieldReadyAt: 0,
+  fireCooldown: 0.45, hookCooldown: 1.8, teleportCooldown: 2.5, shieldCooldown: 4.5, chargeCooldown: 5.5,
+  fireReadyAt: 0, hookReadyAt: 0, teleportReadyAt: 0, shieldReadyAt: 0, chargeReadyAt: 0,
   teleportDistance: 150, shieldUntil: 0,
+  chargeActive: false, chargeDirX: 0, chargeDirY: 0, chargeTimer: 0, chargeHit: false,
   alive: true, deadReason: '', score: 0,
   bodyColor: colorChoices[0].body, wandColor: colorChoices[0].wand,
   aimX: 1, aimY: 0,
 };
 
 // ── Active Spell Loadout (order = slots) ─────────────────────
-let activeSpellLoadout = ['fire', 'hook', 'blink', 'shield'];
+let activeSpellLoadout = ['fire', 'hook', 'blink', 'shield', 'charge'];
 
 // ── Dummy ─────────────────────────────────────────────────────
 const dummy = {
@@ -158,19 +165,20 @@ const menuBtn           = document.getElementById('menuBtn');
 const hudToggleBtn      = document.getElementById('hudToggleBtn');
 const lobbyMenuBtn      = document.getElementById('lobbyMenuBtn');
 const mobileControls    = document.getElementById('mobileControls');
-const mobileMenuBtn     = document.getElementById('mobileMenuBtn');
 const moveJoystick      = document.getElementById('moveJoystick');
 const moveJoystickThumb = document.getElementById('moveJoystickThumb');
 const mobileFireBtn     = document.getElementById('mobileFireBtn');
 const mobileHookBtn     = document.getElementById('mobileHookBtn');
 const mobileTeleportBtn = document.getElementById('mobileTeleportBtn');
 const mobileShieldBtn   = document.getElementById('mobileShieldBtn');
+const mobileChargeBtn   = document.getElementById('mobileChargeBtn');
 
 const skillButtons = {
   fire:   mobileFireBtn,
   hook:   mobileHookBtn,
   blink:  mobileTeleportBtn,
   shield: mobileShieldBtn,
+  charge: mobileChargeBtn,
 };
 
 const resumeBtn         = document.getElementById('resumeBtn');

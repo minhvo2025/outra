@@ -286,6 +286,9 @@ function castPlayerSpell(spellId) {
     case 'shield':
       castShield();
       break;
+    case 'charge':
+      castArcaneCharge();
+      break;
   }
 }
 
@@ -357,6 +360,84 @@ function castShield() {
   player.shieldReadyAt = now + player.shieldCooldown;
   player.shieldUntil   = now + 1.0;
   spawnBurst(player.x, player.y, 'rgba(130,190,255,0.9)', 18, 140);
+}
+
+function stopArcaneCharge(spawnImpact = false) {
+  if (!player.chargeActive) return;
+  player.chargeActive = false;
+  player.chargeTimer = 0;
+  player.vx *= 0.18;
+  player.vy *= 0.18;
+  if (spawnImpact) spawnBurst(player.x, player.y, 'rgba(180,120,255,0.9)', 12, 150);
+}
+
+function castArcaneCharge() {
+  const now = performance.now() / 1000;
+  if (gameState !== 'playing' || !player.alive || now < player.chargeReadyAt || player.chargeActive) return;
+  const dir = getPlayerAim();
+  player.chargeReadyAt = now + player.chargeCooldown;
+  player.chargeActive = true;
+  player.chargeDirX = dir.x;
+  player.chargeDirY = dir.y;
+  player.chargeTimer = 0.34;
+  player.chargeHit = false;
+  player.vx = dir.x * 760;
+  player.vy = dir.y * 760;
+  soundCharge();
+  spawnBurst(player.x, player.y, 'rgba(180,120,255,0.95)', 16, 170);
+}
+
+function updateArcaneCharge(dt) {
+  if (!player.chargeActive || !player.alive) return;
+  if (gameState !== 'playing' && gameState !== 'result') {
+    stopArcaneCharge(false);
+    return;
+  }
+
+  const dir = normalized(player.chargeDirX, player.chargeDirY);
+  const speed = 760;
+  const stepDt = dt / 4;
+
+  for (let step = 0; step < 4; step++) {
+    if (!player.chargeActive) break;
+
+    const nextX = player.x + dir.x * speed * stepDt;
+    const nextY = player.y + dir.y * speed * stepDt;
+    const obstacle = circleHitsObstacle(nextX, nextY, player.r);
+    if (obstacle) {
+      stopArcaneCharge(true);
+      break;
+    }
+
+    player.x = nextX;
+    player.y = nextY;
+    player.vx = dir.x * speed;
+    player.vy = dir.y * speed;
+
+    particles.push({
+      x: player.x - dir.x * (player.r + 6),
+      y: player.y - dir.y * (player.r + 6),
+      vx: -dir.x * 80 + (Math.random() - 0.5) * 70,
+      vy: -dir.y * 80 + (Math.random() - 0.5) * 70,
+      life: 0.18 + Math.random() * 0.06,
+      size: 4 + Math.random() * 3,
+      color: 'rgba(190,140,255,0.92)'
+    });
+
+    if (!player.chargeHit && dummyEnabled && dummy.alive && distance(player.x, player.y, dummy.x, dummy.y) <= player.r + dummy.r + 8) {
+      player.chargeHit = true;
+      damageDummy(16);
+      dummy.vx += dir.x * 720;
+      dummy.vy += dir.y * 720;
+      spawnBurst(dummy.x, dummy.y, 'rgba(210,150,255,0.95)', 18, 210);
+      soundChargeHit();
+      stopArcaneCharge(false);
+      break;
+    }
+  }
+
+  player.chargeTimer -= dt;
+  if (player.chargeTimer <= 0) stopArcaneCharge(false);
 }
 
 function getBlinkTargetPreview() {
@@ -499,6 +580,7 @@ function updateArenaShrink(dt) {
 // ── Match Flow ────────────────────────────────────────────────
 function killPlayer(reason) {
   if (!player.alive) return;
+  stopArcaneCharge(false);
   player.alive = false;
   player.deadReason = reason;
   spawnBurst(player.x, player.y, 'rgba(255,90,50,0.95)', 24, 260);
@@ -533,7 +615,7 @@ function resetRound() {
   arena.shrinkTimer    = arena.shrinkInterval;
   buildObstacles();
   player.hookCooldown  = getHookCooldown();
-  activeSpellLoadout   = ['fire', 'hook', 'blink', 'shield'];
+  activeSpellLoadout   = ['fire', 'hook', 'blink', 'shield', 'charge'];
 
   const p = findValidSpawnNear(playerSpawn.x, playerSpawn.y, 0);
   const d = findValidSpawnNear(dummySpawn.x,  dummySpawn.y,  0);
@@ -541,7 +623,8 @@ function resetRound() {
   Object.assign(player, {
     x: p.x, y: p.y, vx: 0, vy: 0,
     hp: player.maxHp, alive: true, deadReason: '',
-    fireReadyAt: 0, hookReadyAt: 0, teleportReadyAt: 0, shieldReadyAt: 0, shieldUntil: 0,
+    fireReadyAt: 0, hookReadyAt: 0, teleportReadyAt: 0, shieldReadyAt: 0, chargeReadyAt: 0, shieldUntil: 0,
+    chargeActive: false, chargeDirX: 0, chargeDirY: 0, chargeTimer: 0, chargeHit: false,
     aimX: 1, aimY: 0
   });
 
@@ -641,8 +724,12 @@ function update(dt) {
   }
 
   if ((gameState === 'playing' || gameState === 'result') && player.alive) {
-    if ((moveX || moveY) && gameState === 'playing') moveActorWithSlide(player, moveX, moveY, dt);
-    updateActorPhysics(player, dt);
+    if (player.chargeActive) {
+      updateArcaneCharge(dt);
+    } else {
+      if ((moveX || moveY) && gameState === 'playing') moveActorWithSlide(player, moveX, moveY, dt);
+      updateActorPhysics(player, dt);
+    }
   }
 
   if (dummyEnabled && (gameState === 'playing' || gameState === 'result') && dummy.alive) {

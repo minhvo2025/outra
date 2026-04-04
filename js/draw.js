@@ -254,6 +254,21 @@ function drawPlayer() {
     ctx.fill();
     ctx.restore();
   }
+
+  if (player.chargeActive) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(196,150,255,0.95)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.r + 14, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = 'rgba(196,150,255,1)';
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.r + 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawDummy() {
@@ -372,6 +387,31 @@ function drawSkillAimPreview() {
     ctx.arc(target.x, target.y, player.r - 2, 0, Math.PI * 2);
     ctx.globalAlpha = 0.12;
     ctx.fillStyle = target.blocked ? 'rgba(255,90,90,1)' : 'rgba(170,140,255,1)';
+    ctx.fill();
+
+  } else if (skillAimPreview.type === 'charge') {
+    const len = 165;
+    const endX = player.x + dir.x * len;
+    const endY = player.y + dir.y * len;
+
+    ctx.strokeStyle = 'rgba(200,150,255,0.30)';
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(endX, endY, player.r + 6, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(225,190,255,0.80)';
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.13;
+    ctx.fillStyle = 'rgba(190,145,255,1)';
+    ctx.beginPath();
+    ctx.arc(endX, endY, player.r + 2, 0, Math.PI * 2);
     ctx.fill();
   }
 

@@ -219,6 +219,11 @@ window.addEventListener('keydown', (e) => {
     castPlayerSpell('shield');
   }
 
+  if (gameState === 'playing' && norm === keybinds.charge) {
+    startMusicIfNeeded();
+    castPlayerSpell('charge');
+  }
+
   if (gameState !== 'lobby' && norm === keybinds.reset) resetRound();
 
   if (norm === keybinds.menu) {
@@ -272,7 +277,6 @@ canvas.addEventListener('touchmove', (e) => {
 hudToggleBtn.addEventListener('click', () => { hudVisible = !hudVisible; updateHud(); });
 
 menuBtn.addEventListener('click',       () => { menuOpen = !menuOpen; menuPanel.style.display = menuOpen ? 'block' : 'none'; setMenuTab(activeMenuTab); });
-mobileMenuBtn.addEventListener('click', () => { menuOpen = !menuOpen; menuPanel.style.display = menuOpen ? 'block' : 'none'; setMenuTab(activeMenuTab); });
 lobbyMenuBtn.addEventListener('click',  () => { menuOpen = !menuOpen; menuPanel.style.display = menuOpen ? 'block' : 'none'; setMenuTab(activeMenuTab); });
 
 document.querySelectorAll('[data-menu-tab]').forEach(btn =>
@@ -337,6 +341,7 @@ bindPullCastButton(mobileFireBtn,     () => castPlayerSpell('fire'),   'fire');
 bindPullCastButton(mobileHookBtn,     () => castPlayerSpell('hook'),   'hook');
 bindPullCastButton(mobileTeleportBtn, () => castPlayerSpell('blink'),  'blink');
 bindPullCastButton(mobileShieldBtn,   () => castPlayerSpell('shield'), 'shield');
+bindPullCastButton(mobileChargeBtn,   () => castPlayerSpell('charge'), 'charge');
 
 // ── Window Resize ─────────────────────────────────────────────
 window.addEventListener('resize', () => {
