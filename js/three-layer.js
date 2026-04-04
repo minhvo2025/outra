@@ -1,4 +1,3 @@
-console.log('WARLOCK THREE LAYER VERSION B');
 // ── Three.js Character Layer ─────────────────────────────────
 (function () {
   const cfg = window.WARLOCK_3D_CONFIG || {};
@@ -11,6 +10,7 @@ console.log('WARLOCK THREE LAYER VERSION B');
     loader: null,
     ready: false,
     failed: false,
+    debugBox: null,
     player: {
       states: new Map(),
       currentState: 'idle',
@@ -28,23 +28,13 @@ console.log('WARLOCK THREE LAYER VERSION B');
   }
 
   function getGLTFLoaderClass() {
-    if (typeof THREE !== 'undefined' && typeof THREE.GLTFLoader !== 'undefined') {
-      return THREE.GLTFLoader;
-    }
-    if (typeof GLTFLoader !== 'undefined') {
-      return GLTFLoader;
-    }
+    if (typeof THREE !== 'undefined' && typeof THREE.GLTFLoader !== 'undefined') return THREE.GLTFLoader;
+    if (typeof GLTFLoader !== 'undefined') return GLTFLoader;
     return null;
-  }
-
-  function hasThree() {
-    return typeof THREE !== 'undefined' && !!getGLTFLoaderClass();
   }
 
   function initScene() {
     state.container = document.getElementById('threeLayer');
-
-    const LoaderClass = getGLTFLoaderClass();
 
     if (!state.container) {
       state.failed = true;
@@ -58,6 +48,7 @@ console.log('WARLOCK THREE LAYER VERSION B');
       return;
     }
 
+    const LoaderClass = getGLTFLoaderClass();
     if (!LoaderClass) {
       state.failed = true;
       console.error('[Warlock3D] GLTFLoader is not loaded.');
@@ -80,7 +71,8 @@ console.log('WARLOCK THREE LAYER VERSION B');
       5000
     );
 
-    state.camera.position.set(0, 1000, 0);
+    // Straight top-down camera
+    state.camera.position.set(0, 1200, 0);
     state.camera.up.set(0, 0, -1);
     state.camera.lookAt(0, 0, 0);
 
@@ -90,22 +82,20 @@ console.log('WARLOCK THREE LAYER VERSION B');
     });
     state.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     state.renderer.setSize(width, height);
-    if ('outputColorSpace' in state.renderer && THREE.SRGBColorSpace) {
-      state.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    }
+    state.renderer.setClearColor(0x000000, 0);
 
     state.container.innerHTML = '';
     state.container.appendChild(state.renderer.domElement);
 
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x334455, 2.2);
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x334455, 2.6);
     hemi.position.set(0, 500, 0);
     state.scene.add(hemi);
 
-    const dir = new THREE.DirectionalLight(0xffffff, 1.6);
+    const dir = new THREE.DirectionalLight(0xffffff, 1.9);
     dir.position.set(180, 360, 120);
     state.scene.add(dir);
 
-    const fill = new THREE.DirectionalLight(0x88aaff, 0.8);
+    const fill = new THREE.DirectionalLight(0x88aaff, 1.1);
     fill.position.set(-180, 220, -60);
     state.scene.add(fill);
 
@@ -114,11 +104,11 @@ console.log('WARLOCK THREE LAYER VERSION B');
     state.player.rootGroup = new THREE.Group();
     state.scene.add(state.player.rootGroup);
 
-    const shadowGeo = new THREE.CircleGeometry(cfg.shadowSize || 20, 24);
+    const shadowGeo = new THREE.CircleGeometry(cfg.shadowSize || 24, 32);
     const shadowMat = new THREE.MeshBasicMaterial({
       color: 0x000000,
       transparent: true,
-      opacity: 0.24,
+      opacity: 0.22,
       depthWrite: false,
     });
     const shadow = new THREE.Mesh(shadowGeo, shadowMat);
@@ -126,6 +116,17 @@ console.log('WARLOCK THREE LAYER VERSION B');
     shadow.position.y = -1;
     state.player.shadow = shadow;
     state.player.rootGroup.add(shadow);
+
+    // Visible debug marker so we know where the player origin is.
+    const debugGeo = new THREE.BoxGeometry(24, 80, 24);
+    const debugMat = new THREE.MeshBasicMaterial({
+      color: 0xff00ff,
+      transparent: true,
+      opacity: 0.22,
+    });
+    state.debugBox = new THREE.Mesh(debugGeo, debugMat);
+    state.debugBox.position.set(0, 40, 0);
+    state.player.rootGroup.add(state.debugBox);
 
     window.addEventListener('resize', onResize);
 
@@ -156,38 +157,78 @@ console.log('WARLOCK THREE LAYER VERSION B');
     return cloned;
   }
 
-  function prepareModel(root) {
+  function traverseMeshes(root, fn) {
     root.traverse((obj) => {
-      if (obj.isMesh) {
-        obj.castShadow = false;
-        obj.receiveShadow = false;
+      if (obj.isMesh || obj.isSkinnedMesh) fn(obj);
+    });
+  }
 
-        if (Array.isArray(obj.material)) {
-          obj.material = obj.material.map(cloneMaterial);
-        } else if (obj.material) {
-          obj.material = cloneMaterial(obj.material);
-        }
+  function computeBox(root) {
+    return new THREE.Box3().setFromObject(root);
+  }
+
+  function centerAndScaleModel(root) {
+    traverseMeshes(root, (obj) => {
+      obj.castShadow = false;
+      obj.receiveShadow = false;
+      obj.frustumCulled = false;
+
+      if (Array.isArray(obj.material)) {
+        obj.material = obj.material.map(cloneMaterial);
+      } else if (obj.material) {
+        obj.material = cloneMaterial(obj.material);
       }
     });
 
-    const box = new THREE.Box3().setFromObject(root);
-    const center = new THREE.Vector3();
-    const size = new THREE.Vector3();
+    // First box
+    let box = computeBox(root);
+    let center = new THREE.Vector3();
+    let size = new THREE.Vector3();
     box.getCenter(center);
     box.getSize(size);
 
+    // Auto-fix likely Z-up exports
+    if (size.y < size.z) {
+      root.rotation.x = -Math.PI / 2;
+      box = computeBox(root);
+      box.getCenter(center);
+      box.getSize(size);
+      log('Auto-rotated model from Z-up to Y-up');
+    }
+
     root.position.sub(center);
 
-    const maxDim = Math.max(size.x || 1, size.y || 1, size.z || 1);
-    const targetSize = cfg.actorScale || 28;
-    const fitScale = targetSize / maxDim;
+    // Recompute after centering
+    box = computeBox(root);
+    box.getCenter(center);
+    box.getSize(size);
 
-    root.scale.setScalar(fitScale);
-    root.rotation.set(0, 0, 0);
-    root.position.y += (size.y * fitScale) * 0.5 + (cfg.hoverHeight || 0);
+    const targetHeight = cfg.actorHeight || 95;
+    const sourceHeight = Math.max(size.y || 1, 1);
+    const scale = targetHeight / sourceHeight;
 
+    root.scale.setScalar(scale);
+
+    // Recompute once more after scale
+    box = computeBox(root);
+    box.getCenter(center);
+    box.getSize(size);
+
+    root.position.y += (size.y * 0.5) + (cfg.hoverHeight || 0);
+
+    log('Prepared model size:', {
+      x: size.x.toFixed(2),
+      y: size.y.toFixed(2),
+      z: size.z.toFixed(2),
+      scale: scale.toFixed(2),
+    });
+  }
+
+  function prepareModel(root, stateName) {
+    centerAndScaleModel(root);
     root.visible = false;
     state.player.rootGroup.add(root);
+    log('Prepared state:', stateName);
   }
 
   function loadCharacterStates() {
@@ -206,29 +247,37 @@ console.log('WARLOCK THREE LAYER VERSION B');
       state.loader.load(
         url,
         (gltf) => {
-          const root = gltf.scene;
-          console.log('[Warlock3D] loaded state:', name, root);
+          try {
+            const root = gltf.scene;
+            console.log('[Warlock3D] loaded state:', name, root);
 
-          prepareModel(root);
+            prepareModel(root, name);
 
-          const mixer = gltf.animations && gltf.animations.length
-            ? new THREE.AnimationMixer(root)
-            : null;
+            const mixer = gltf.animations && gltf.animations.length
+              ? new THREE.AnimationMixer(root)
+              : null;
 
-          const action = mixer && gltf.animations[0]
-            ? mixer.clipAction(gltf.animations[0])
-            : null;
+            const action = mixer && gltf.animations[0]
+              ? mixer.clipAction(gltf.animations[0])
+              : null;
 
-          if (action) {
-            action.enabled = true;
-            action.clampWhenFinished = false;
-            action.setLoop(THREE.LoopRepeat, Infinity);
-            action.play();
+            if (action) {
+              action.enabled = true;
+              action.clampWhenFinished = false;
+              action.setLoop(THREE.LoopRepeat, Infinity);
+              action.play();
+              log(`Animation attached for ${name}:`, gltf.animations[0].name || '(unnamed)');
+            } else {
+              log(`No animation clip found for ${name}`);
+            }
+
+            state.player.states.set(name, { root, mixer, action });
+          } catch (e) {
+            console.error('[Warlock3D] Error preparing state', name, e);
           }
 
-          state.player.states.set(name, { root, mixer, action });
-
           remaining -= 1;
+
           if (remaining === 0) {
             if (state.player.states.size === 0) {
               state.failed = true;
@@ -238,7 +287,16 @@ console.log('WARLOCK THREE LAYER VERSION B');
 
             state.ready = true;
             state.player.lastHp = typeof player !== 'undefined' ? player.hp : 100;
-            setPlayerState('idle', true);
+
+            // Hide debug box once at least one model is ready
+            if (state.debugBox) state.debugBox.visible = false;
+
+            const first = state.player.states.has('idle')
+              ? 'idle'
+              : Array.from(state.player.states.keys())[0];
+
+            setPlayerState(first, true);
+
             console.log('[Warlock3D] states loaded:', Array.from(state.player.states.keys()));
             log('3D player ready');
           }
@@ -258,9 +316,10 @@ console.log('WARLOCK THREE LAYER VERSION B');
 
   function getWorldPosition(actor) {
     const worldScale = cfg.worldScale || 1;
-    const x = (actor.x - window.innerWidth / 2) * worldScale;
-    const z = (actor.y - window.innerHeight / 2) * worldScale;
-    return { x, z };
+    return {
+      x: (actor.x - window.innerWidth / 2) * worldScale,
+      z: (actor.y - window.innerHeight / 2) * worldScale,
+    };
   }
 
   function setPlayerState(name, force = false) {
@@ -278,6 +337,8 @@ console.log('WARLOCK THREE LAYER VERSION B');
         entry.action.play();
       }
     });
+
+    log('Switched state to:', name);
   }
 
   function chooseState(dt) {
@@ -318,26 +379,27 @@ console.log('WARLOCK THREE LAYER VERSION B');
     if (!p) return;
 
     const pos = getWorldPosition(p);
+    const stateName = chooseState(dt);
+
+    state.player.rootGroup.visible = gameState !== 'lobby';
     state.player.rootGroup.position.set(pos.x, 0, pos.z);
 
     const aimAngle = Math.atan2(p.aimY, p.aimX);
     state.player.rootGroup.rotation.y = -aimAngle + Math.PI / 2;
 
-    const stateName = chooseState(dt);
     setPlayerState(stateName);
 
-    const bob = stateName === 'run' ? Math.sin(performance.now() * 0.012) * 1.6 : 0;
+    const bob = stateName === 'run' ? Math.sin(performance.now() * 0.012) * 1.5 : 0;
     state.player.rootGroup.position.y = bob;
 
     if (state.player.shadow) {
       state.player.shadow.scale.setScalar(stateName === 'dash' ? 1.25 : 1);
-      state.player.shadow.material.opacity = p.alive ? 0.24 : 0.12;
+      state.player.shadow.material.opacity = p.alive ? 0.22 : 0.12;
     }
   }
 
   function updateMixers(dt) {
     if (!state.ready) return;
-
     state.player.states.forEach((entry) => {
       if (entry.mixer) entry.mixer.update(dt);
     });
