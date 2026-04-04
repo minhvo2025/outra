@@ -95,11 +95,11 @@ const skillAimPreview = { active: false, type: null, dx: 1, dy: 0 };
 window.WARLOCK_3D_CONFIG = {
   enabled: true,
   playerCharacter: {
-    idle: 'assets/characters/arcane_duelist/idle.glb',
-    run: 'assets/characters/arcane_duelist/run.glb',
-    cast: 'assets/characters/arcane_duelist/cast.glb',
-    dash: 'assets/characters/arcane_duelist/dash.glb',
-    hit: 'assets/characters/arcane_duelist/hit.glb',
+    idle: 'docs/art/character/idle.glb',
+    run: 'docs/art/character/run.glb',
+    cast: 'docs/art/character/cast.glb',
+    dash: 'docs/art/character/dash.glb',
+    hit: 'docs/art/character/hit.glb',
   },
   worldScale: 1,
   actorScale: 28,
