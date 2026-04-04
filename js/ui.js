@@ -1,11 +1,11 @@
 // ── Helpers ───────────────────────────────────────────────────
 function escapeHtml(value) {
   return String(value)
-    .replaceAll('&',  '&amp;')
-    .replaceAll('<',  '&lt;')
-    .replaceAll('>',  '&gt;')
-    .replaceAll('"',  '&quot;')
-    .replaceAll("'",  '&#39;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function normalizeKey(key) { return key === ' ' ? 'space' : String(key).toLowerCase(); }
@@ -103,9 +103,9 @@ function renderLeaderboard() {
 function equipItem(id) {
   const item = storeItems.find(x => x.id === id);
   if (!item || !profile.store[id]) return;
-  if (item.type === 'hat')     profile.equipped.hat    = id;
-  if (item.type === 'sweater') profile.equipped.sweater = true;
-  if (item.type === 'boots')   profile.equipped.boots   = true;
+  if (item.type === 'hat')      profile.equipped.hat = id;
+  if (item.type === 'sweater')  profile.equipped.sweater = true;
+  if (item.type === 'boots')    profile.equipped.boots = true;
   saveProfile();
   renderStore();
   renderInventory();
@@ -117,7 +117,7 @@ function unwearItem(id) {
   if (!item) return;
   if (item.type === 'hat' && profile.equipped.hat === id) profile.equipped.hat = null;
   if (item.type === 'sweater') profile.equipped.sweater = false;
-  if (item.type === 'boots')   profile.equipped.boots   = false;
+  if (item.type === 'boots')   profile.equipped.boots = false;
   saveProfile();
   renderStore();
   renderInventory();
@@ -125,7 +125,7 @@ function unwearItem(id) {
 }
 
 function renderInventory() {
-  const ownedHats      = storeItems.filter(item => item.type === 'hat'                            && profile.store[item.id]);
+  const ownedHats      = storeItems.filter(item => item.type === 'hat' && profile.store[item.id]);
   const ownedWearables = storeItems.filter(item => (item.type === 'sweater' || item.type === 'boots') && profile.store[item.id]);
 
   const hatRows = ownedHats.length
@@ -233,14 +233,18 @@ function renderStore() {
 // ── HUD ───────────────────────────────────────────────────────
 function updateSkillCooldownButtons() {
   const now = performance.now() / 1000;
-  const cooldowns = {
-    fire:   Math.max(0, player.fireReadyAt - now),
-    hook:   Math.max(0, player.hookReadyAt - now),
-    blink:  Math.max(0, player.teleportReadyAt - now),
-    shield: now < player.shieldUntil
-      ? (player.shieldUntil - now)
-      : Math.max(0, player.shieldReadyAt - now),
-  };
+  const cooldowns = {};
+
+  activeSpellLoadout.forEach(spellId => {
+    const def = SPELL_DEFS[spellId];
+    if (!def) return;
+
+    if (spellId === 'shield' && now < player.shieldUntil) {
+      cooldowns[spellId] = player.shieldUntil - now;
+    } else {
+      cooldowns[spellId] = Math.max(0, (player[def.cooldownKey] || 0) - now);
+    }
+  });
 
   // Mobile buttons
   Object.entries(skillButtons).forEach(([key, btn]) => {
@@ -272,7 +276,7 @@ function updateSkillCooldownButtons() {
   });
 
   // Keep keybind labels in sync with current bindings
-  const keyMap = { hook: 'dkey-hook', blink: 'dkey-blink', shield: 'dkey-shield' };
+  const keyMap  = { hook: 'dkey-hook', blink: 'dkey-blink', shield: 'dkey-shield' };
   const bindMap = { hook: keybinds.hook, blink: keybinds.teleport, shield: keybinds.shield };
   Object.entries(keyMap).forEach(([skill, elId]) => {
     const el = document.getElementById(elId);
@@ -281,8 +285,8 @@ function updateSkillCooldownButtons() {
 }
 
 function updateHud() {
-  hpEl.textContent           = `HP: ${Math.ceil(player.hp)}` + (player.alive ? '' : ' (dead)');
-  dummyHpEl.textContent      = !dummyEnabled
+  hpEl.textContent            = `HP: ${Math.ceil(player.hp)}` + (player.alive ? '' : ' (dead)');
+  dummyHpEl.textContent       = !dummyEnabled
     ? 'Dummy HP: removed'
     : (dummy.alive ? `Dummy HP: ${Math.ceil(dummy.hp)}` : `Dummy HP: dead (${dummy.deadReason})`);
   playerNameHudEl.textContent = `Name: ${player.name}`;
@@ -297,8 +301,10 @@ function updateHud() {
   toggleDummyBtn.textContent  = dummyEnabled ? 'Remove Dummy' : 'Add Dummy';
   hudToggleBtn.textContent    = hudVisible ? 'Hide Info' : 'Show Info';
   hud.style.display           = (gameState !== 'lobby' && hudVisible) ? 'block' : 'none';
+
   const spellBar = document.getElementById('desktopSpellBar');
   if (spellBar) spellBar.style.display = (gameState !== 'lobby' && !isTouchDevice) ? 'flex' : 'none';
+
   updateSkillCooldownButtons();
 }
 
