@@ -298,7 +298,7 @@ function updateHud() {
   hudToggleBtn.textContent    = hudVisible ? 'Hide Info' : 'Show Info';
   hud.style.display           = (gameState !== 'lobby' && hudVisible) ? 'block' : 'none';
   const spellBar = document.getElementById('desktopSpellBar');
-  if (spellBar) spellBar.style.display = gameState !== 'lobby' ? '' : 'none';
+  if (spellBar) spellBar.style.display = (gameState !== 'lobby' && !isTouchDevice) ? 'flex' : 'none';
   updateSkillCooldownButtons();
 }
 
