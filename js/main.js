@@ -3,12 +3,15 @@ function loop(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.033);
   lastTime = now;
   update(dt);
+  if (window.warlockThree && window.warlockThree.update) window.warlockThree.update(dt);
   render();
   requestAnimationFrame(loop);
 }
 
 // ── Init ──────────────────────────────────────────────────────
 const resetMoveStick = makeStickController(moveJoystick, moveJoystickThumb, moveStick);
+
+if (window.warlockThree && window.warlockThree.init) window.warlockThree.init();
 
 loadProfile();
 applyPlayerColors();

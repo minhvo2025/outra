@@ -247,6 +247,7 @@ function damagePlayer(amount) {
     return;
   }
   player.hp = Math.max(0, player.hp - amount);
+  if (window.warlockThree && window.warlockThree.triggerHit) window.warlockThree.triggerHit();
   spawnDamageText(player.x, player.y - player.r, amount);
   soundHit();
   if (player.hp <= 0) killPlayer('HP reached 0');
@@ -299,6 +300,7 @@ function shootFire() {
   const dir = getPlayerAim();
   player.fireReadyAt = now + player.fireCooldown;
   soundFire();
+  if (window.warlockThree && window.warlockThree.triggerCast) window.warlockThree.triggerCast();
   projectiles.push({
     owner: 'player',
     x: player.x + dir.x * (player.r + 10),
@@ -330,6 +332,7 @@ function castHookFromPlayer() {
   const dir = getPlayerAim();
   player.hookReadyAt = now + player.hookCooldown;
   soundHook();
+  if (window.warlockThree && window.warlockThree.triggerCast) window.warlockThree.triggerCast();
   hooks.push({
     owner: 'player', state: 'flying',
     x: player.x, y: player.y, sx: player.x, sy: player.y,
@@ -359,6 +362,7 @@ function castShield() {
   if (gameState !== 'playing' || !player.alive || now < player.shieldReadyAt) return;
   player.shieldReadyAt = now + player.shieldCooldown;
   player.shieldUntil   = now + 1.0;
+  if (window.warlockThree && window.warlockThree.triggerCast) window.warlockThree.triggerCast();
   spawnBurst(player.x, player.y, 'rgba(130,190,255,0.9)', 18, 140);
 }
 
@@ -376,13 +380,14 @@ function castArcaneCharge() {
   if (gameState !== 'playing' || !player.alive || now < player.chargeReadyAt || player.chargeActive) return;
   const dir = getPlayerAim();
   player.chargeReadyAt = now + player.chargeCooldown;
+  if (window.warlockThree && window.warlockThree.triggerDash) window.warlockThree.triggerDash();
   player.chargeActive = true;
   player.chargeDirX = dir.x;
   player.chargeDirY = dir.y;
   player.chargeTimer = 0.34;
   player.chargeHit = false;
-  player.vx = dir.x * 532;
-  player.vy = dir.y * 532;
+  player.vx = dir.x * 760;
+  player.vy = dir.y * 760;
   soundCharge();
   spawnBurst(player.x, player.y, 'rgba(180,120,255,0.95)', 16, 170);
 }
@@ -395,7 +400,7 @@ function updateArcaneCharge(dt) {
   }
 
   const dir = normalized(player.chargeDirX, player.chargeDirY);
-  const speed = 532;
+  const speed = 760;
   const stepDt = dt / 4;
 
   for (let step = 0; step < 4; step++) {
@@ -426,7 +431,7 @@ function updateArcaneCharge(dt) {
 
     if (!player.chargeHit && dummyEnabled && dummy.alive && distance(player.x, player.y, dummy.x, dummy.y) <= player.r + dummy.r + 8) {
       player.chargeHit = true;
-      damageDummy(8);
+      damageDummy(16);
       dummy.vx += dir.x * 720;
       dummy.vy += dir.y * 720;
       spawnBurst(dummy.x, dummy.y, 'rgba(210,150,255,0.95)', 18, 210);
@@ -461,6 +466,7 @@ function tryTeleport() {
   const target = getBlinkTargetPreview();
   if (target.blocked) return;
   player.teleportReadyAt = now + player.teleportCooldown;
+  if (window.warlockThree && window.warlockThree.triggerCast) window.warlockThree.triggerCast();
   soundTeleport();
   spawnBurst(player.x, player.y, 'rgba(160,120,255,0.9)', 18, 220);
   player.x = target.x;

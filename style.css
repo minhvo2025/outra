@@ -277,3 +277,9 @@ input[type="text"] {
 }
 
 
+
+
+#stage { position:fixed; inset:0; overflow:hidden; }
+#game { position:absolute; inset:0; z-index:1; }
+#threeLayer { position:absolute; inset:0; z-index:2; pointer-events:none; }
+#threeLayer canvas { display:block; width:100%; height:100%; }

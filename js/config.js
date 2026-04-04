@@ -90,6 +90,26 @@ let hudVisible = true;
 
 const skillAimPreview = { active: false, type: null, dx: 1, dy: 0 };
 
+
+// ── 3D Character Layer ───────────────────────────────────────
+window.WARLOCK_3D_CONFIG = {
+  enabled: true,
+  playerCharacter: {
+    idle: 'assets/characters/arcane_duelist/idle.glb',
+    run: 'assets/characters/arcane_duelist/run.glb',
+    cast: 'assets/characters/arcane_duelist/cast.glb',
+    dash: 'assets/characters/arcane_duelist/dash.glb',
+    hit: 'assets/characters/arcane_duelist/hit.glb',
+  },
+  worldScale: 1,
+  actorScale: 28,
+  hoverHeight: 0,
+  shadowSize: 20,
+  castHoldTime: 0.22,
+  hitHoldTime: 0.28,
+  dashHoldTime: 0.30,
+};
+
 // ── Input State ───────────────────────────────────────────────
 const keys = {};
 const mouse = { x: 0, y: 0 };
