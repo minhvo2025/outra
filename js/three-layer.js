@@ -88,7 +88,7 @@
     });
   }
 
-  function centerAndScaleModel(root) {
+  function centerAndScaleModel(root, targetHeightOverride) {
     traverseMeshes(root, (obj) => {
       obj.castShadow = false;
       obj.receiveShadow = false;
@@ -121,7 +121,7 @@
     box.getCenter(center);
     box.getSize(size);
 
-    const targetHeight = cfg.actorHeight || 95;
+    const targetHeight = targetHeightOverride || cfg.actorHeight || 95;
     const sourceHeight = Math.max(size.y || 1, 1);
     const scale = targetHeight / sourceHeight;
 
@@ -141,12 +141,20 @@
     });
   }
 
-  function prepareModel(root, stateName, parentGroup) {
-    centerAndScaleModel(root);
+  function prepareArenaModel(root, stateName, parentGroup) {
+    centerAndScaleModel(root, cfg.actorHeight || 95);
     tintModel(root, player.bodyColor, player.wandColor);
     root.visible = false;
     parentGroup.add(root);
     log('Prepared state:', stateName);
+  }
+
+  function preparePreviewModel(root, stateName, parentGroup) {
+    centerAndScaleModel(root, 118);
+    tintModel(root, player.bodyColor, player.wandColor);
+    root.visible = false;
+    parentGroup.add(root);
+    log('Prepared preview state:', stateName);
   }
 
   function initScene() {
@@ -260,6 +268,9 @@
       state.preview.host.style.position = 'relative';
     }
 
+    const oldCanvas = document.getElementById('previewCanvas3d');
+    if (oldCanvas) oldCanvas.remove();
+
     const canvas3d = document.createElement('canvas');
     canvas3d.id = 'previewCanvas3d';
     canvas3d.setAttribute('aria-hidden', 'true');
@@ -271,7 +282,7 @@
     canvas3d.style.pointerEvents = 'auto';
     canvas3d.style.background = 'transparent';
     canvas3d.style.borderRadius = '14px';
-    canvas3d.style.zIndex = '2';
+    canvas3d.style.zIndex = '3';
 
     state.preview.host.appendChild(canvas3d);
     state.preview.canvas3d = canvas3d;
@@ -279,13 +290,13 @@
     state.preview.scene = new THREE.Scene();
 
     state.preview.camera = new THREE.PerspectiveCamera(
-      32,
+      28,
       Math.max(1, canvas2d.clientWidth) / Math.max(1, canvas2d.clientHeight),
       0.1,
       1000
     );
-    state.preview.camera.position.set(0, 56, 210);
-    state.preview.camera.lookAt(0, 52, 0);
+    state.preview.camera.position.set(0, 64, 250);
+    state.preview.camera.lookAt(0, 56, 0);
 
     state.preview.renderer = new THREE.WebGLRenderer({
       canvas: canvas3d,
@@ -296,19 +307,19 @@
     state.preview.renderer.setSize(canvas2d.clientWidth || canvas2d.width, canvas2d.clientHeight || canvas2d.height, false);
     state.preview.renderer.setClearColor(0x000000, 0);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 1.7);
+    const ambient = new THREE.AmbientLight(0xffffff, 1.75);
     state.preview.scene.add(ambient);
 
-    const key = new THREE.DirectionalLight(0xffffff, 1.6);
-    key.position.set(90, 140, 120);
+    const key = new THREE.DirectionalLight(0xffffff, 1.8);
+    key.position.set(120, 160, 160);
     state.preview.scene.add(key);
 
-    const fill = new THREE.DirectionalLight(0xa8c4ff, 0.9);
-    fill.position.set(-80, 70, 110);
+    const fill = new THREE.DirectionalLight(0xa8c4ff, 1.0);
+    fill.position.set(-110, 80, 120);
     state.preview.scene.add(fill);
 
-    const rim = new THREE.DirectionalLight(0xffffff, 0.85);
-    rim.position.set(-70, 110, -120);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.95);
+    rim.position.set(-90, 120, -150);
     state.preview.scene.add(rim);
 
     state.preview.rootGroup = new THREE.Group();
@@ -324,7 +335,7 @@
     state.preview.shadow = new THREE.Mesh(shadowGeo, shadowMat);
     state.preview.shadow.rotation.x = -Math.PI / 2;
     state.preview.shadow.position.y = 0;
-    state.preview.shadow.scale.set(1.45, 0.72, 1);
+    state.preview.shadow.scale.set(1.7, 0.8, 1);
     state.preview.rootGroup.add(state.preview.shadow);
 
     bindPreviewInput();
@@ -416,7 +427,7 @@
         (gltf) => {
           try {
             const arenaRoot = gltf.scene;
-            prepareModel(arenaRoot, name, state.player.rootGroup);
+            prepareArenaModel(arenaRoot, name, state.player.rootGroup);
 
             const arenaMixer = gltf.animations && gltf.animations.length
               ? new THREE.AnimationMixer(arenaRoot)
@@ -441,7 +452,7 @@
 
             if (state.preview.rootGroup) {
               const previewRoot = gltf.scene.clone(true);
-              prepareModel(previewRoot, name, state.preview.rootGroup);
+              preparePreviewModel(previewRoot, name, state.preview.rootGroup);
 
               const previewMixer = gltf.animations && gltf.animations.length
                 ? new THREE.AnimationMixer(previewRoot)
@@ -630,13 +641,11 @@
     state.preview.rootGroup.visible = gameState === 'lobby';
     if (!state.preview.rootGroup.visible) return;
 
-    state.preview.targetRotationY += state.preview.dragging ? 0 : 0.0025;
     state.preview.currentRotationY += (state.preview.targetRotationY - state.preview.currentRotationY) * 0.14;
     state.preview.rootGroup.rotation.y = state.preview.currentRotationY;
+    state.preview.rootGroup.position.set(0, 0, 0);
 
-    state.preview.rootGroup.position.set(0, 6, 0);
     setPreviewState('idle');
-
     tintAllLoadedModels();
   }
 
@@ -668,8 +677,18 @@
     },
 
     render() {
-      if (!state.renderer || !state.scene || !state.camera) return;
-      state.renderer.render(state.scene, state.camera);
+      if (state.renderer && state.scene && state.camera) {
+        state.renderer.render(state.scene, state.camera);
+      }
+
+      if (
+        state.preview.renderer &&
+        state.preview.scene &&
+        state.preview.camera &&
+        gameState === 'lobby'
+      ) {
+        state.preview.renderer.render(state.preview.scene, state.preview.camera);
+      }
     },
 
     renderLobbyPreview() {
