@@ -346,6 +346,7 @@ bindPullCastButton(mobileHookBtn,     () => castPlayerSpell('hook'),   'hook');
 bindPullCastButton(mobileTeleportBtn, () => castPlayerSpell('blink'),  'blink');
 bindPullCastButton(mobileShieldBtn,   () => castPlayerSpell('shield'), 'shield');
 bindPullCastButton(mobileChargeBtn,   () => castPlayerSpell('charge'), 'charge');
+bindPullCastButton(mobileShockBtn, () => castPlayerSpell('shock'), 'shock');
 
 // ── Window Resize ─────────────────────────────────────────────
 window.addEventListener('resize', () => {
