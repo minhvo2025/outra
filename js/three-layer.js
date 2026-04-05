@@ -382,7 +382,15 @@
     const stateName = chooseState(dt);
 
     state.player.rootGroup.visible = gameState !== 'lobby';
-    state.player.rootGroup.position.set(pos.x, -70, pos.z);
+
+const baseYOffset = isTouchDevice
+  ? (cfg.modelYOffsetMobile || 0)
+  : (cfg.modelYOffset || 0);
+
+state.player.rootGroup.position.set(pos.x, baseYOffset, pos.z);
+
+const bob = stateName === 'run' ? Math.sin(performance.now() * 0.012) * 1.5 : 0;
+state.player.rootGroup.position.y = baseYOffset + bob;
 
     const aimAngle = Math.atan2(p.aimY, p.aimX);
     state.player.rootGroup.rotation.y = -aimAngle + Math.PI / 2;
