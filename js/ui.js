@@ -286,9 +286,17 @@ function updateSkillCooldownButtons() {
 
 function updateHud() {
   hpEl.textContent            = `HP: ${Math.ceil(player.hp)}` + (player.alive ? '' : ' (dead)');
-  dummyHpEl.textContent       = !dummyEnabled
-    ? 'Dummy HP: removed'
-    : (dummy.alive ? `Dummy HP: ${Math.ceil(dummy.hp)}` : `Dummy HP: dead (${dummy.deadReason})`);
+if (standingDummyBtn) standingDummyBtn.textContent = dummyEnabled && dummyBehavior === 'standing'
+  ? 'Standing Dummy On'
+  : 'Start Standing Dummy';
+
+if (activeDummyBtn) activeDummyBtn.textContent = dummyEnabled && dummyBehavior === 'active'
+  ? 'Active Dummy On'
+  : 'Start Active Dummy';
+
+if (removeDummyBtn) removeDummyBtn.textContent = dummyEnabled ? 'Remove Dummy' : 'No Dummy';
+
+hudToggleBtn.textContent = hudVisible ? 'Hide Info' : 'Show Info';
   playerNameHudEl.textContent = `Name: ${player.name}`;
   scoreHudEl.textContent      = `Score: ${player.score}`;
   wlkHudEl.textContent        = `WLK: ${profile.wlk}`;
