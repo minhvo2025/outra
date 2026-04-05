@@ -58,49 +58,61 @@ function drawLobbyPreview() {
   previewCtx.fillStyle = '#242630';
   previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
 
-  previewCtx.fillStyle = 'rgba(255,120,30,0.35)';
+  previewCtx.fillStyle = 'rgba(255,120,30,0.22)';
   previewCtx.beginPath();
-  previewCtx.arc(previewCanvas.width / 2, previewCanvas.height - 10, 170, 0, Math.PI * 2);
+  previewCtx.ellipse(previewCanvas.width / 2, previewCanvas.height - 2, 130, 34, 0, 0, Math.PI * 2);
   previewCtx.fill();
 
   previewCtx.fillStyle = '#3a4047';
   previewCtx.beginPath();
-  previewCtx.arc(previewCanvas.width / 2, previewCanvas.height - 18, 115, 0, Math.PI * 2);
+  previewCtx.ellipse(previewCanvas.width / 2, previewCanvas.height - 18, 96, 26, 0, 0, Math.PI * 2);
   previewCtx.fill();
 
   previewCtx.strokeStyle = '#8a939e';
-  previewCtx.lineWidth = 5;
+  previewCtx.lineWidth = 4;
   previewCtx.beginPath();
-  previewCtx.arc(previewCanvas.width / 2, previewCanvas.height - 18, 115, 0, Math.PI * 2);
+  previewCtx.ellipse(previewCanvas.width / 2, previewCanvas.height - 18, 96, 26, 0, 0, Math.PI * 2);
   previewCtx.stroke();
-
-  const x = previewCanvas.width / 2;
-  const y = previewCanvas.height / 2 + 18;
-
-  previewCtx.fillStyle = 'rgba(0,0,0,0.25)';
-  previewCtx.beginPath();
-  previewCtx.ellipse(x, y + 42, 32, 12, 0, 0, Math.PI * 2);
-  previewCtx.fill();
-
-  previewCtx.fillStyle = player.bodyColor;
-  previewCtx.beginPath();
-  previewCtx.arc(x, y, 32, 0, Math.PI * 2);
-  previewCtx.fill();
-
-  drawCosmetics(previewCtx, x, y, 1);
-
-  previewCtx.fillStyle = player.wandColor;
-  previewCtx.save();
-  previewCtx.translate(x, y);
-  previewCtx.rotate(-0.3);
-  previewCtx.fillRect(2, -5, 34, 10);
-  previewCtx.restore();
 
   previewCtx.fillStyle = 'rgba(255,255,255,0.95)';
   previewCtx.font = 'bold 18px Arial';
   previewCtx.textAlign = 'center';
-  previewCtx.fillText(player.name || 'Player', x, 34);
+  previewCtx.fillText(player.name || 'Player', previewCanvas.width / 2, 34);
+
+  previewCtx.font = '13px Arial';
+  previewCtx.fillStyle = 'rgba(255,255,255,0.72)';
+  previewCtx.fillText('Drag to rotate', previewCanvas.width / 2, previewCanvas.height - 16);
   previewCtx.textAlign = 'left';
+
+  if (
+    window.warlockThree &&
+    typeof window.warlockThree.renderLobbyPreview === 'function'
+  ) {
+    window.warlockThree.renderLobbyPreview();
+  } else {
+    // fallback if 3D preview has not loaded yet
+    const x = previewCanvas.width / 2;
+    const y = previewCanvas.height / 2 + 18;
+
+    previewCtx.fillStyle = 'rgba(0,0,0,0.25)';
+    previewCtx.beginPath();
+    previewCtx.ellipse(x, y + 42, 32, 12, 0, 0, Math.PI * 2);
+    previewCtx.fill();
+
+    previewCtx.fillStyle = player.bodyColor;
+    previewCtx.beginPath();
+    previewCtx.arc(x, y, 32, 0, Math.PI * 2);
+    previewCtx.fill();
+
+    drawCosmetics(previewCtx, x, y, 1);
+
+    previewCtx.fillStyle = player.wandColor;
+    previewCtx.save();
+    previewCtx.translate(x, y);
+    previewCtx.rotate(-0.3);
+    previewCtx.fillRect(2, -5, 34, 10);
+    previewCtx.restore();
+  }
 }
 
 // ── Arena ─────────────────────────────────────────────────────
