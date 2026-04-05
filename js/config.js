@@ -102,8 +102,9 @@ let lavaSoundTimer = 0;
 let musicMuted = false;
 let activeMenuTab = 'main';
 let activeLobbyTab = 'play';
-let dummyEnabled = true;
-let hudVisible = true;
+let dummyEnabled = false;
+let dummyBehavior = 'active'; // 'active' | 'standing'
+let hudVisible = false;
 
 const skillAimPreview = { active: false, type: null, dx: 1, dy: 0 };
 
@@ -227,7 +228,9 @@ const resumeBtn         = document.getElementById('resumeBtn');
 const toLobbyBtn        = document.getElementById('toLobbyBtn');
 const resetBtn          = document.getElementById('resetBtn');
 const musicToggleBtn    = document.getElementById('musicToggleBtn');
-const toggleDummyBtn    = document.getElementById('toggleDummyBtn');
+const standingDummyBtn  = document.getElementById('standingDummyBtn');
+const activeDummyBtn    = document.getElementById('activeDummyBtn');
+const removeDummyBtn    = document.getElementById('removeDummyBtn');
 const menuResetBindsBtn = document.getElementById('menuResetBindsBtn');
 
 const hpEl              = document.getElementById('hp');
