@@ -748,20 +748,22 @@
       updateMixers(dt);
     },
 
-    render() {
-      if (state.renderer && state.scene && state.camera) {
-        state.renderer.render(state.scene, state.camera);
-      }
+render() {
+  if (gameState === 'lobby') {
+    if (
+      state.preview.renderer &&
+      state.preview.scene &&
+      state.preview.camera
+    ) {
+      state.preview.renderer.render(state.preview.scene, state.preview.camera);
+    }
+    return;
+  }
 
-      if (
-        state.preview.renderer &&
-        state.preview.scene &&
-        state.preview.camera &&
-        gameState === 'lobby'
-      ) {
-        state.preview.renderer.render(state.preview.scene, state.preview.camera);
-      }
-    },
+  if (state.renderer && state.scene && state.camera) {
+    state.renderer.render(state.scene, state.camera);
+  }
+},
 
     renderLobbyPreview() {
       if (!state.preview.renderer || !state.preview.scene || !state.preview.camera) return;
