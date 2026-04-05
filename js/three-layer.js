@@ -682,15 +682,22 @@
         const pos = getWorldPosition(p);
     const stateName = chooseState(dt);
 
-    const baseHeightOffset = cfg.modelYOffset || 0;
+        const baseHeightOffset = cfg.modelYOffset || 0;
     const mobileHeightOffset = cfg.modelYOffsetMobile || 0;
-    const mobileScreenOffsetZ = isTouchDevice ? 40 : 0;
+
+    const mobileBaseScreenOffsetZ = 40;
+    const mobileDriftStrength = 18;
+
+    const normalizedScreenY = ((player.y / canvas.height) - 0.5) * 2;
+    const mobileDynamicOffsetZ = isTouchDevice
+      ? mobileBaseScreenOffsetZ - (normalizedScreenY * mobileDriftStrength)
+      : 0;
 
     state.player.rootGroup.visible = gameState !== 'lobby';
     state.player.rootGroup.position.set(
       pos.x,
       isTouchDevice ? mobileHeightOffset : baseHeightOffset,
-      pos.z + mobileScreenOffsetZ
+      pos.z + mobileDynamicOffsetZ
     );
 
     const aimAngle = Math.atan2(p.aimY, p.aimX);
