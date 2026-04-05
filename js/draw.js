@@ -248,7 +248,7 @@ function drawActor(actor, bodyColor, wandColor, aimAngle = 0, healthColor = '#6c
 }
 
 function drawPlayer() {
-  if (window.warlockThree && window.warlockThree.isPlayerRenderedIn3D && window.warlockThree.isPlayerRenderedIn3D()) {
+    if (window.outraThree && window.outraThree.isPlayerRenderedIn3D && window.outraThree.isPlayerRenderedIn3D()) {
     return;
   }
   const angle = Math.atan2(player.aimY, player.aimX);
@@ -489,7 +489,8 @@ function render() {
   drawCrosshair();
   drawResultOverlay();
 
-  if (window.warlockThree && window.warlockThree.render) {
-    window.warlockThree.render();
+    if (window.outraThree && window.outraThree.render) {
+    window.outraThree.render();
+  }
   }
 }
