@@ -145,8 +145,11 @@
               <div>
                 <div class="previewPanel">
                   <div class="sectionTitle" style="margin-top: 0;">Character Preview</div>
-                  <canvas id="previewCanvas" width="320" height="240"></canvas>
-                  <div class="hint" style="margin-top: 10px;">The preview changes color immediately when you choose a color.</div>
+                  <div id="previewViewport">
+                    <canvas id="previewCanvas" width="320" height="240"></canvas>
+                    <div id="previewThreeLayer" aria-hidden="true"></div>
+                  </div>
+                  <div class="hint" style="margin-top: 10px;">Idle animation plays in the lobby. Drag left or right to rotate the model.</div>
                 </div>
                 <div class="inventoryPanel" style="margin-top: 14px;">
                   <div class="sectionTitle" style="margin-top: 0;">Inventory</div>
