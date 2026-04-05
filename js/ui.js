@@ -231,6 +231,13 @@ function renderStore() {
 }
 
 // ── HUD ───────────────────────────────────────────────────────
+function triggerReadyFlash(el) {
+  if (!el) return;
+  el.classList.remove('readyFlash');
+  void el.offsetWidth; // restart animation
+  el.classList.add('readyFlash');
+}
+
 function updateSkillCooldownButtons() {
   const now = performance.now() / 1000;
   const cooldowns = {};
@@ -249,15 +256,25 @@ function updateSkillCooldownButtons() {
   // Mobile buttons
   Object.entries(skillButtons).forEach(([key, btn]) => {
     if (!btn) return;
+
     const cdOverlay = btn.querySelector('.mobileBtnCooldown');
     if (!cdOverlay) return;
+
     const cd = cooldowns[key] || 0;
+    const wasOnCooldown = btn.classList.contains('onCooldown');
+
     if (cd > 0.02) {
       btn.classList.add('onCooldown');
       cdOverlay.textContent = String(Math.ceil(cd));
+      btn.dataset.readyFlashed = '0';
     } else {
       btn.classList.remove('onCooldown');
       cdOverlay.textContent = '';
+
+      if (wasOnCooldown && btn.dataset.readyFlashed !== '1') {
+        triggerReadyFlash(btn);
+        btn.dataset.readyFlashed = '1';
+      }
     }
   });
 
@@ -266,18 +283,28 @@ function updateSkillCooldownButtons() {
     const cell = document.getElementById(`dspell-${key}`);
     const cdEl = document.getElementById(`dcd-${key}`);
     if (!cell || !cdEl) return;
+
+    const wasOnCooldown = cell.classList.contains('onCooldown');
+
     if (cd > 0.02) {
       cell.classList.add('onCooldown');
       cdEl.textContent = String(Math.ceil(cd));
+      cell.dataset.readyFlashed = '0';
     } else {
       cell.classList.remove('onCooldown');
       cdEl.textContent = '';
+
+      if (wasOnCooldown && cell.dataset.readyFlashed !== '1') {
+        triggerReadyFlash(cell);
+        cell.dataset.readyFlashed = '1';
+      }
     }
   });
 
   // Keep keybind labels in sync with current bindings
   const keyMap  = { hook: 'dkey-hook', blink: 'dkey-blink', shield: 'dkey-shield', charge: 'dkey-charge', shock: 'dkey-shock' };
   const bindMap = { hook: keybinds.hook, blink: keybinds.teleport, shield: keybinds.shield, charge: keybinds.charge, shock: keybinds.shock };
+
   Object.entries(keyMap).forEach(([skill, elId]) => {
     const el = document.getElementById(elId);
     if (el) el.textContent = prettyKey(bindMap[skill]);
