@@ -505,11 +505,20 @@ input[type="text"] {
 #desktopSpellBar {
   position: fixed;
   bottom: calc(var(--safe-bottom) + 18px);
-  left: calc(var(--safe-left) + 18px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 20;
+
   display: flex;
   gap: 10px;
   align-items: flex-end;
+
+  /* Optional: nicer feel */
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: rgba(10, 10, 14, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .deskSpell {
