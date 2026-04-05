@@ -224,6 +224,10 @@ window.addEventListener('keydown', (e) => {
     castPlayerSpell('charge');
   }
 
+if (gameState === 'playing' && norm === keybinds.shock) {
+  startMusicIfNeeded();
+  castPlayerSpell('shock');
+}
   if (gameState !== 'lobby' && norm === keybinds.reset) resetRound();
 
   if (norm === keybinds.menu) {
