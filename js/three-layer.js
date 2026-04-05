@@ -686,7 +686,7 @@
     const mobileHeightOffset = cfg.modelYOffsetMobile || 0;
 
     const mobileBaseScreenOffsetZ = 40;
-    const mobileDriftStrength = 18;
+    const mobileDriftStrength = 24;
 
     const normalizedScreenY = ((player.y / canvas.height) - 0.5) * 2;
     const mobileDynamicOffsetZ = isTouchDevice
