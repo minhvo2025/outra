@@ -82,11 +82,11 @@ const storeItems = [
 // ── Keybinds ──────────────────────────────────────────────────
 const defaultBinds = {
   up: 'w', down: 's', left: 'a', right: 'd',
-  hook: 'e', teleport: 'space', shield: 'q', charge: 'f', reset: 'r', menu: 'escape'
+  hook: 'space', teleport: '', shield: 'q', charge: 'f', reset: 'r', menu: 'escape', shock: 'c',
 };
 const bindLabels = {
   up: 'Move Up', down: 'Move Down', left: 'Move Left', right: 'Move Right',
-  hook: 'Hook', teleport: 'Teleport', shield: 'Shield', charge: 'Arcane Charge', reset: 'Reset Round', menu: 'Menu'
+  hook: 'Hook', teleport: 'Teleport', shield: 'Shield', charge: 'Arcane Charge', reset: 'Reset Round', menu: 'Menu', shock: 'Shock'
 };
 
 let keybinds = { ...defaultBinds };
