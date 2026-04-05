@@ -50,6 +50,38 @@
     return null;
   }
 
+  function getPreviewSettings() {
+    const previewCfg = cfg.previewCharacter || {};
+    const mobile = isTouchDevice;
+
+    return {
+      targetHeight: mobile
+        ? (previewCfg.targetHeightMobile || 70)
+        : (previewCfg.targetHeightDesktop || 118),
+      cameraFov: mobile
+        ? (previewCfg.cameraFovMobile || 40)
+        : (previewCfg.cameraFovDesktop || 28),
+      cameraY: mobile
+        ? (previewCfg.cameraYMobile || 52)
+        : (previewCfg.cameraYDesktop || 64),
+      cameraZ: mobile
+        ? (previewCfg.cameraZMobile || 420)
+        : (previewCfg.cameraZDesktop || 250),
+      lookAtY: mobile
+        ? (previewCfg.lookAtYMobile || 42)
+        : (previewCfg.lookAtYDesktop || 56),
+      modelYOffset: mobile
+        ? (previewCfg.modelYOffsetMobile || -8)
+        : (previewCfg.modelYOffsetDesktop || 0),
+      shadowScaleX: mobile
+        ? (previewCfg.shadowScaleXMobile || 1.45)
+        : (previewCfg.shadowScaleXDesktop || 1.7),
+      shadowScaleY: mobile
+        ? (previewCfg.shadowScaleYMobile || 0.72)
+        : (previewCfg.shadowScaleYDesktop || 0.8),
+    };
+  }
+
   function cloneMaterial(mat) {
     if (!mat) return mat;
     const cloned = mat.clone();
@@ -150,7 +182,8 @@
   }
 
   function preparePreviewModel(root, stateName, parentGroup) {
-    centerAndScaleModel(root, 118);
+    const previewSettings = getPreviewSettings();
+    centerAndScaleModel(root, previewSettings.targetHeight);
     tintModel(root, player.bodyColor, player.wandColor);
     root.visible = false;
     parentGroup.add(root);
@@ -289,14 +322,16 @@
 
     state.preview.scene = new THREE.Scene();
 
+    const previewSettings = getPreviewSettings();
+
     state.preview.camera = new THREE.PerspectiveCamera(
-      28,
+      previewSettings.cameraFov,
       Math.max(1, canvas2d.clientWidth) / Math.max(1, canvas2d.clientHeight),
       0.1,
       1000
     );
-    state.preview.camera.position.set(0, 64, 250);
-    state.preview.camera.lookAt(0, 56, 0);
+    state.preview.camera.position.set(0, previewSettings.cameraY, previewSettings.cameraZ);
+    state.preview.camera.lookAt(0, previewSettings.lookAtY, 0);
 
     state.preview.renderer = new THREE.WebGLRenderer({
       canvas: canvas3d,
@@ -335,7 +370,13 @@
     state.preview.shadow = new THREE.Mesh(shadowGeo, shadowMat);
     state.preview.shadow.rotation.x = -Math.PI / 2;
     state.preview.shadow.position.y = 0;
-    state.preview.shadow.scale.set(1.7, 0.8, 1);
+
+    state.preview.shadow.scale.set(
+      previewSettings.shadowScaleX,
+      previewSettings.shadowScaleY,
+      1
+    );
+
     state.preview.rootGroup.add(state.preview.shadow);
 
     bindPreviewInput();
@@ -403,8 +444,22 @@
       state.preview.canvas3d.style.width = `${width}px`;
       state.preview.canvas3d.style.height = `${height}px`;
 
+      const previewSettings = getPreviewSettings();
+
+      state.preview.camera.fov = previewSettings.cameraFov;
       state.preview.camera.aspect = width / Math.max(1, height);
+      state.preview.camera.position.set(0, previewSettings.cameraY, previewSettings.cameraZ);
+      state.preview.camera.lookAt(0, previewSettings.lookAtY, 0);
       state.preview.camera.updateProjectionMatrix();
+
+      if (state.preview.shadow) {
+        state.preview.shadow.scale.set(
+          previewSettings.shadowScaleX,
+          previewSettings.shadowScaleY,
+          1
+        );
+      }
+
       state.preview.renderer.setSize(width, height, false);
     }
   }
@@ -510,7 +565,6 @@
             }
 
             state.ready = true;
-            state.preview.ready = state.preview.states.size > 0;
             state.player.lastHp = typeof player !== 'undefined' ? player.hp : 100;
 
             if (state.debugBox) state.debugBox.visible = false;
@@ -519,12 +573,7 @@
               ? 'idle'
               : Array.from(state.player.states.keys())[0];
 
-            const firstPreview = state.preview.states.has('idle')
-              ? 'idle'
-              : Array.from(state.preview.states.keys())[0];
-
             setArenaPlayerState(firstArena, true);
-            setPreviewState(firstPreview, true);
 
             log('3D player ready');
           }
@@ -572,7 +621,7 @@
   }
 
   function setPreviewState(name, force = false) {
-    if (!state.preview.ready) return;
+    if (!state.preview.states.size) return;
     if (!force && state.preview.currentState === name) return;
 
     state.preview.currentState = name;
@@ -657,14 +706,16 @@
   }
 
   function updatePreviewPose() {
-    if (!state.preview.ready || !state.preview.rootGroup) return;
+    if (!state.preview.states.size || !state.preview.rootGroup) return;
 
     state.preview.rootGroup.visible = gameState === 'lobby';
     if (!state.preview.rootGroup.visible) return;
 
     state.preview.currentRotationY += (state.preview.targetRotationY - state.preview.currentRotationY) * 0.14;
     state.preview.rootGroup.rotation.y = state.preview.currentRotationY;
-    state.preview.rootGroup.position.set(0, 0, 0);
+
+    const previewSettings = getPreviewSettings();
+    state.preview.rootGroup.position.set(0, previewSettings.modelYOffset, 0);
 
     setPreviewState('idle');
     tintAllLoadedModels();
