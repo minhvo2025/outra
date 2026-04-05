@@ -57,11 +57,11 @@
   return {
     targetHeight: mobile
       ? (previewCfg.targetHeightMobile || 70)
-      : (previewCfg.targetHeightDesktop || 104),
+      : (previewCfg.targetHeightDesktop || 98),
 
     cameraFov: mobile
       ? (previewCfg.cameraFovMobile || 40)
-      : (previewCfg.cameraFovDesktop || 34),
+      : (previewCfg.cameraFovDesktop || 36),
 
     cameraY: mobile
       ? (previewCfg.cameraYMobile || 52)
@@ -69,11 +69,11 @@
 
     cameraZ: mobile
       ? (previewCfg.cameraZMobile || 420)
-      : (previewCfg.cameraZDesktop || 360),
+      : (previewCfg.cameraZDesktop || 380),
 
     lookAtY: mobile
       ? (previewCfg.lookAtYMobile || 42)
-      : (previewCfg.lookAtYDesktop || 66),
+      : (previewCfg.lookAtYDesktop || 64),
 
     modelYOffset: mobile
       ? (previewCfg.modelYOffsetMobile || -8)
