@@ -735,7 +735,7 @@ function resetRound() {
   arena.shrinkTimer    = arena.shrinkInterval;
   buildObstacles();
   player.hookCooldown  = getHookCooldown();
-  activeSpellLoadout   = ['fire', 'hook', 'blink', 'shield', 'charge'];
+  activeSpellLoadout   = ['fire', 'hook', 'blink', 'shield', 'charge', 'shock'];
 
   const p = findValidSpawnNear(playerSpawn.x, playerSpawn.y, 0);
   const d = findValidSpawnNear(dummySpawn.x,  dummySpawn.y,  0);
