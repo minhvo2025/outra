@@ -310,7 +310,6 @@ removeDummyBtn.addEventListener('click', () => {
   removeDummy();
   updateHud();
 });
-});
 
 menuResetBindsBtn.addEventListener('click', () => {
   keybinds       = { ...defaultBinds };
