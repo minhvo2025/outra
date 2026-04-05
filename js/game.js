@@ -590,7 +590,8 @@ function tryTeleport() {
 
 // ── AI ────────────────────────────────────────────────────────
 function moveDummyAI(dt) {
-  if (!dummyEnabled || !dummy.alive || !player.alive || gameState !== 'playing') return;
+if (!dummyEnabled || !dummy.alive || !player.alive || gameState !== 'playing') return;
+if (dummyBehavior !== 'active') return;
   dummy.aiSwitchTimer -= dt;
   dummy.aiMoveTimer   -= dt;
   const distToPlayer = distance(dummy.x, dummy.y, player.x, player.y);
@@ -729,7 +730,25 @@ function endMatch(playerWon) {
   resultTimer = 2.2;
   updateHud();
 }
+function spawnDummy(mode = 'active') {
+  dummyEnabled = true;
+  dummyBehavior = mode;
 
+  const d = findValidSpawnNear(dummySpawn.x, dummySpawn.y, 0);
+
+Object.assign(dummy, {
+  x: d.x, y: d.y, vx: 0, vy: 0,
+  hp: dummy.maxHp, alive: dummyEnabled, deadReason: dummyEnabled ? '' : 'removed',
+  fireReadyAt: 0, hookReadyAt: 0,
+  aiSwitchTimer: 0, aiMoveTimer: 0, targetX: d.x, targetY: d.y
+});
+}
+
+function removeDummy() {
+  dummyEnabled = false;
+  dummy.alive = false;
+  dummy.deadReason = 'removed';
+}
 function resetRound() {
   updateArenaGeometry(true);
   arena.shrinkTimer    = arena.shrinkInterval;
