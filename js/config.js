@@ -168,7 +168,7 @@ const player = {
 };
 
 // ── Active Spell Loadout (order = slots) ─────────────────────
-let activeSpellLoadout = ['fire', 'hook', 'blink', 'shield', 'charge'];
+let activeSpellLoadout = ['fire', 'hook', 'blink', 'shield', 'charge', 'shock'];
 
 // ── Dummy ─────────────────────────────────────────────────────
 const dummy = {
@@ -212,6 +212,7 @@ const mobileHookBtn     = document.getElementById('mobileHookBtn');
 const mobileTeleportBtn = document.getElementById('mobileTeleportBtn');
 const mobileShieldBtn   = document.getElementById('mobileShieldBtn');
 const mobileChargeBtn   = document.getElementById('mobileChargeBtn');
+const mobileShockBtn    = document.getElementById('mobileShockBtn');
 
 const skillButtons = {
   fire:   mobileFireBtn,
@@ -219,6 +220,7 @@ const skillButtons = {
   blink:  mobileTeleportBtn,
   shield: mobileShieldBtn,
   charge: mobileChargeBtn,
+  shock:  mobileShockBtn,
 };
 
 const resumeBtn         = document.getElementById('resumeBtn');
