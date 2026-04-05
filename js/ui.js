@@ -285,18 +285,31 @@ function updateSkillCooldownButtons() {
 }
 
 function updateHud() {
-  hpEl.textContent            = `HP: ${Math.ceil(player.hp)}` + (player.alive ? '' : ' (dead)');
-if (standingDummyBtn) standingDummyBtn.textContent = dummyEnabled && dummyBehavior === 'standing'
-  ? 'Standing Dummy On'
-  : 'Start Standing Dummy';
+  hpEl.textContent = `HP: ${Math.ceil(player.hp)}` + (player.alive ? '' : ' (dead)');
 
-if (activeDummyBtn) activeDummyBtn.textContent = dummyEnabled && dummyBehavior === 'active'
-  ? 'Active Dummy On'
-  : 'Start Active Dummy';
+  dummyHpEl.textContent = !dummyEnabled
+    ? 'Dummy HP: removed'
+    : dummy.alive
+      ? `${dummyBehavior === 'standing' ? 'Standing Dummy' : 'Active Dummy'} HP: ${Math.ceil(dummy.hp)}`
+      : `Dummy HP: dead (${dummy.deadReason})`;
 
-if (removeDummyBtn) removeDummyBtn.textContent = dummyEnabled ? 'Remove Dummy' : 'No Dummy';
+  if (standingDummyBtn) {
+    standingDummyBtn.textContent = dummyEnabled && dummyBehavior === 'standing'
+      ? 'Standing Dummy On'
+      : 'Start Standing Dummy';
+  }
 
-hudToggleBtn.textContent = hudVisible ? 'Hide Info' : 'Show Info';
+  if (activeDummyBtn) {
+    activeDummyBtn.textContent = dummyEnabled && dummyBehavior === 'active'
+      ? 'Active Dummy On'
+      : 'Start Active Dummy';
+  }
+
+  if (removeDummyBtn) {
+    removeDummyBtn.textContent = dummyEnabled ? 'Remove Dummy' : 'No Dummy';
+  }
+
+  hudToggleBtn.textContent    = hudVisible ? 'Hide Info' : 'Show Info';
   playerNameHudEl.textContent = `Name: ${player.name}`;
   scoreHudEl.textContent      = `Score: ${player.score}`;
   wlkHudEl.textContent        = `WLK: ${profile.wlk}`;
@@ -304,11 +317,10 @@ hudToggleBtn.textContent = hudVisible ? 'Hide Info' : 'Show Info';
   controlsHudEl.textContent   = isTouchDevice
     ? 'Touch: Move stick | Pull skill and release to cast | Top-right Menu'
     : `Fire: Mouse1 | Hook: ${prettyKey(keybinds.hook)} | Teleport: ${prettyKey(keybinds.teleport)} | Shield: ${prettyKey(keybinds.shield)} | Charge: ${prettyKey(keybinds.charge)} | Shock: ${prettyKey(keybinds.shock)} | Menu: ${prettyKey(keybinds.menu)}`;
-  musicToggleBtn.textContent  = `Music: ${musicMuted ? 'Off' : 'On'}`;
-  musicToggleBtn.className    = musicMuted ? 'musicToggleOff' : 'musicToggleOn';
-  toggleDummyBtn.textContent  = dummyEnabled ? 'Remove Dummy' : 'Add Dummy';
-  hudToggleBtn.textContent    = hudVisible ? 'Hide Info' : 'Show Info';
-  hud.style.display           = (gameState !== 'lobby' && hudVisible) ? 'block' : 'none';
+
+  musicToggleBtn.textContent = `Music: ${musicMuted ? 'Off' : 'On'}`;
+  musicToggleBtn.className   = musicMuted ? 'musicToggleOff' : 'musicToggleOn';
+  hud.style.display          = (gameState !== 'lobby' && hudVisible) ? 'block' : 'none';
 
   const spellBar = document.getElementById('desktopSpellBar');
   if (spellBar) spellBar.style.display = (gameState !== 'lobby' && !isTouchDevice) ? 'flex' : 'none';
