@@ -5,20 +5,42 @@ function saveProfile() {
 
 function loadProfile() {
   try {
-    const raw = localStorage.getItem(PROFILE_KEY);
+    let raw = localStorage.getItem(PROFILE_KEY);
+    let usedLegacy = false;
+
+    if (!raw) {
+      raw = localStorage.getItem(LEGACY_PROFILE_KEY);
+      usedLegacy = !!raw;
+    }
+
     if (!raw) return;
+
     const data = JSON.parse(raw);
+
     if (data.name) player.name = String(data.name).slice(0, 16);
-    if (Number.isInteger(data.selectedColorIndex) && colorChoices[data.selectedColorIndex])
+
+    if (Number.isInteger(data.selectedColorIndex) && colorChoices[data.selectedColorIndex]) {
       selectedColorIndex = data.selectedColorIndex;
-    if (data.keybinds && typeof data.keybinds === 'object')
+    }
+
+    if (data.keybinds && typeof data.keybinds === 'object') {
       keybinds = { ...defaultBinds, ...data.keybinds };
+    }
+
     if (data.profile && typeof data.profile === 'object') {
-      profile.wlk        = Number(data.profile.wlk) || 0;
+      profile.wlk = Number(data.profile.wlk) || 0;
       profile.musicMuted = !!data.profile.musicMuted;
-      if (typeof data.profile.aimSensitivity === 'number') profile.aimSensitivity = data.profile.aimSensitivity;
-      profile.store    = { ...profile.store,    ...(data.profile.store    || {}) };
+
+      if (typeof data.profile.aimSensitivity === 'number') {
+        profile.aimSensitivity = data.profile.aimSensitivity;
+      }
+
+      profile.store = { ...profile.store, ...(data.profile.store || {}) };
       profile.equipped = { ...profile.equipped, ...(data.profile.equipped || {}) };
+    }
+
+    if (usedLegacy) {
+      saveProfile();
     }
   } catch {}
   musicMuted = profile.musicMuted;
@@ -28,37 +50,27 @@ function loadProfile() {
 // ── Leaderboard ───────────────────────────────────────────────
 function getLeaderboard() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    let raw = localStorage.getItem(STORAGE_KEY);
+    let usedLegacy = false;
+
+    if (!raw) {
+      raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      usedLegacy = !!raw;
+    }
+
     if (!raw) return [];
+
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const entries = Array.isArray(parsed) ? parsed : [];
+
+    if (usedLegacy) {
+      saveLeaderboard(entries);
+    }
+
+    return entries;
   } catch {
     return [];
   }
-}
-
-function saveLeaderboard(entries) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-}
-
-function awardWinRewards(name) {
-  const entries  = getLeaderboard();
-  const existing = entries.find(e => e.name.toLowerCase() === name.toLowerCase());
-  if (existing) existing.points += 3;
-  else entries.push({ name, points: 3 });
-  entries.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
-  saveLeaderboard(entries.slice(0, 20));
-  player.score = (entries.find(e => e.name.toLowerCase() === name.toLowerCase()) || { points: 0 }).points;
-  profile.wlk += 1;
-  saveProfile();
-  renderLeaderboard();
-  renderStore();
-  renderInventory();
-}
-
-function getPlayerPoints(name) {
-  const entry = getLeaderboard().find(e => e.name.toLowerCase() === name.toLowerCase());
-  return entry ? entry.points : 0;
 }
 
 // ── Math Helpers ──────────────────────────────────────────────
