@@ -451,29 +451,50 @@
             });
 
             if (state.preview.rootGroup) {
-              const previewRoot = gltf.scene.clone(true);
-              preparePreviewModel(previewRoot, name, state.preview.rootGroup);
+              state.loader.load(
+                url,
+                (previewGltf) => {
+                  try {
+                    const previewRoot = previewGltf.scene;
+                    preparePreviewModel(previewRoot, name, state.preview.rootGroup);
 
-              const previewMixer = gltf.animations && gltf.animations.length
-                ? new THREE.AnimationMixer(previewRoot)
-                : null;
+                    const previewMixer = previewGltf.animations && previewGltf.animations.length
+                      ? new THREE.AnimationMixer(previewRoot)
+                      : null;
 
-              const previewAction = previewMixer && gltf.animations[0]
-                ? previewMixer.clipAction(gltf.animations[0])
-                : null;
+                    const previewAction = previewMixer && previewGltf.animations[0]
+                      ? previewMixer.clipAction(previewGltf.animations[0])
+                      : null;
 
-              if (previewAction) {
-                previewAction.enabled = true;
-                previewAction.clampWhenFinished = false;
-                previewAction.setLoop(THREE.LoopRepeat, Infinity);
-                previewAction.play();
-              }
+                    if (previewAction) {
+                      previewAction.enabled = true;
+                      previewAction.clampWhenFinished = false;
+                      previewAction.setLoop(THREE.LoopRepeat, Infinity);
+                      previewAction.play();
+                    }
 
-              state.preview.states.set(name, {
-                root: previewRoot,
-                mixer: previewMixer,
-                action: previewAction,
-              });
+                    state.preview.states.set(name, {
+                      root: previewRoot,
+                      mixer: previewMixer,
+                      action: previewAction,
+                    });
+
+                    if (!state.preview.ready && state.preview.states.size > 0) {
+                      state.preview.ready = true;
+                      const firstPreview = state.preview.states.has('idle')
+                        ? 'idle'
+                        : Array.from(state.preview.states.keys())[0];
+                      setPreviewState(firstPreview, true);
+                    }
+                  } catch (e) {
+                    console.error('[Outra3D] Error preparing preview state', name, e);
+                  }
+                },
+                undefined,
+                (error) => {
+                  console.error('[Outra3D] Failed to load preview state', url, error);
+                }
+              );
             }
           } catch (e) {
             console.error('[Outra3D] Error preparing state', name, e);
