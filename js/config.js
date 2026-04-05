@@ -7,8 +7,11 @@ const BRAND = {
 };
 
 // ── Storage Keys ──────────────────────────────────────────────
-const STORAGE_KEY = 'warlock_mvp_leaderboard_v1';
-const PROFILE_KEY = 'warlock_mvp_profile_v14';
+const STORAGE_KEY = `${BRAND.storagePrefix}_leaderboard_v1`;
+const PROFILE_KEY = `${BRAND.storagePrefix}_profile_v1`;
+
+const LEGACY_STORAGE_KEY = 'warlock_mvp_leaderboard_v1';
+const LEGACY_PROFILE_KEY = 'warlock_mvp_profile_v14';
 
 // ── Device Detection ──────────────────────────────────────────
 const isTouchDevice = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 900;
