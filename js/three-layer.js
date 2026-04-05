@@ -57,27 +57,27 @@
   return {
     targetHeight: mobile
       ? (previewCfg.targetHeightMobile || 70)
-      : (previewCfg.targetHeightDesktop || 110), // slightly smaller for better framing
+      : (previewCfg.targetHeightDesktop || 104),
 
     cameraFov: mobile
       ? (previewCfg.cameraFovMobile || 40)
-      : (previewCfg.cameraFovDesktop || 32), // wider FOV to fit full body
+      : (previewCfg.cameraFovDesktop || 34),
 
     cameraY: mobile
       ? (previewCfg.cameraYMobile || 52)
-      : (previewCfg.cameraYDesktop || 78), // ↑ lift camera
+      : (previewCfg.cameraYDesktop || 80),
 
     cameraZ: mobile
       ? (previewCfg.cameraZMobile || 420)
-      : (previewCfg.cameraZDesktop || 340), // ← pull camera back (KEY FIX)
+      : (previewCfg.cameraZDesktop || 360),
 
     lookAtY: mobile
       ? (previewCfg.lookAtYMobile || 42)
-      : (previewCfg.lookAtYDesktop || 68), // ↑ aim at torso/head instead of legs
+      : (previewCfg.lookAtYDesktop || 66),
 
     modelYOffset: mobile
       ? (previewCfg.modelYOffsetMobile || -8)
-      : (previewCfg.modelYOffsetDesktop || -6), // ↓ shift model slightly down
+      : (previewCfg.modelYOffsetDesktop || -8),
 
     shadowScaleX: mobile
       ? (previewCfg.shadowScaleXMobile || 1.45)
