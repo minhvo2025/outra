@@ -489,7 +489,7 @@ function render() {
   drawCrosshair();
   drawResultOverlay();
 
-    if (window.outraThree && window.outraThree.render) {
+  if (window.outraThree && window.outraThree.render) {
     window.outraThree.render();
   }
 }
