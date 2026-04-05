@@ -1,3 +1,11 @@
+// ── Brand ─────────────────────────────────────────────────────
+const BRAND = {
+  name: 'Outra',
+  lobbyTitle: 'Outra',
+  storagePrefix: 'outra',
+  legacyStoragePrefix: 'warlock_mvp',
+};
+
 // ── Storage Keys ──────────────────────────────────────────────
 const STORAGE_KEY = 'warlock_mvp_leaderboard_v1';
 const PROFILE_KEY = 'warlock_mvp_profile_v14';
