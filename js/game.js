@@ -104,6 +104,8 @@ function getPlayerPoints(name) {
 }
 
 // ── Math Helpers ──────────────────────────────────────────────
+
+// ── Math Helpers ──────────────────────────────────────────────
 function distance(ax, ay, bx, by) { return Math.hypot(bx - ax, by - ay); }
 function normalized(dx, dy) { const len = Math.hypot(dx, dy) || 1; return { x: dx / len, y: dy / len }; }
 function insidePlatform(x, y, padding = 0) { return distance(x, y, arena.cx, arena.cy) <= arena.radius - padding; }
