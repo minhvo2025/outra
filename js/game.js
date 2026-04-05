@@ -334,6 +334,9 @@ function castPlayerSpell(spellId) {
     case 'charge':
       castArcaneCharge();
       break;
+    case 'shock':
+    castShockBlast();
+      break;
   }
 }
 
@@ -434,6 +437,73 @@ player.chargeTimer = player.teleportDistance / 760;
   player.vy = dir.y * 760;
   soundCharge();
   spawnBurst(player.x, player.y, 'rgba(180,120,255,0.95)', 16, 170);
+}
+
+function castShockBlast() {
+  const now = performance.now() / 1000;
+
+  if (
+    gameState !== 'playing' ||
+    !player.alive ||
+    now < player.shockReadyAt
+  ) return;
+
+  const dir = getPlayerAim();
+
+  // cooldown
+  player.shockReadyAt = now + player.shockCooldown;
+
+  // animation
+  if (window.outraThree && window.outraThree.triggerCast) {
+    window.outraThree.triggerCast();
+  }
+
+  // sound
+  soundShock();
+
+  // SETTINGS
+  const range = 115;
+  const angle = Math.PI / 3; // 60° cone
+  const damage = 14;
+  const knockback = 680;
+
+  // HIT CHECK
+  if (dummyEnabled && dummy.alive) {
+    const dx = dummy.x - player.x;
+    const dy = dummy.y - player.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist <= range) {
+      const nd = normalized(dx, dy);
+
+      // angle check (cone)
+      const dot = nd.x * dir.x + nd.y * dir.y;
+
+      if (dot > Math.cos(angle / 2)) {
+        damageDummy(damage);
+
+        dummy.vx += nd.x * knockback;
+        dummy.vy += nd.y * knockback;
+
+        spawnBurst(
+          dummy.x,
+          dummy.y,
+          'rgba(255,200,120,0.95)',
+          18,
+          200
+        );
+      }
+    }
+  }
+
+  // player effect
+  spawnBurst(
+    player.x,
+    player.y,
+    'rgba(255,180,120,0.7)',
+    12,
+    120
+  );
 }
 
 function updateArcaneCharge(dt) {
