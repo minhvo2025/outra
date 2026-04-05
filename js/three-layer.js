@@ -71,7 +71,6 @@
       5000
     );
 
-    // Straight top-down camera
     state.camera.position.set(0, 1200, 0);
     state.camera.up.set(0, 0, -1);
     state.camera.lookAt(0, 0, 0);
@@ -117,7 +116,6 @@
     state.player.shadow = shadow;
     state.player.rootGroup.add(shadow);
 
-    // Visible debug marker so we know where the player origin is.
     const debugGeo = new THREE.BoxGeometry(24, 80, 24);
     const debugMat = new THREE.MeshBasicMaterial({
       color: 0xff00ff,
@@ -180,14 +178,12 @@
       }
     });
 
-    // First box
     let box = computeBox(root);
     let center = new THREE.Vector3();
     let size = new THREE.Vector3();
     box.getCenter(center);
     box.getSize(size);
 
-    // Auto-fix likely Z-up exports
     if (size.y < size.z) {
       root.rotation.x = -Math.PI / 2;
       box = computeBox(root);
@@ -198,7 +194,6 @@
 
     root.position.sub(center);
 
-    // Recompute after centering
     box = computeBox(root);
     box.getCenter(center);
     box.getSize(size);
@@ -209,7 +204,6 @@
 
     root.scale.setScalar(scale);
 
-    // Recompute once more after scale
     box = computeBox(root);
     box.getCenter(center);
     box.getSize(size);
@@ -288,7 +282,6 @@
             state.ready = true;
             state.player.lastHp = typeof player !== 'undefined' ? player.hp : 100;
 
-            // Hide debug box once at least one model is ready
             if (state.debugBox) state.debugBox.visible = false;
 
             const first = state.player.states.has('idle')
@@ -314,17 +307,17 @@
     });
   }
 
- function getWorldPosition(actor) {
-  const worldScale = cfg.worldScale || 1;
+  function getWorldPosition(actor) {
+    const worldScale = cfg.worldScale || 1;
 
-  const centerX = canvas.width * 0.5;
-  const centerY = canvas.height * 0.5;
+    const centerX = canvas.width * 0.5;
+    const centerY = canvas.height * 0.5;
 
-  return {
-    x: (actor.x - centerX) * worldScale,
-    z: (actor.y - centerY) * worldScale,
-  };
-}
+    return {
+      x: (actor.x - centerX) * worldScale,
+      z: (actor.y - centerY) * worldScale,
+    };
+  }
 
   function setPlayerState(name, force = false) {
     if (!state.ready) return;
@@ -385,8 +378,12 @@
     const pos = getWorldPosition(p);
     const stateName = chooseState(dt);
 
+    const baseYOffset = isTouchDevice
+      ? (cfg.modelYOffsetMobile || 0)
+      : (cfg.modelYOffset || 0);
+
     state.player.rootGroup.visible = gameState !== 'lobby';
-    state.player.rootGroup.position.set(pos.x, -70, pos.z);
+    state.player.rootGroup.position.set(pos.x, baseYOffset, pos.z);
 
     const aimAngle = Math.atan2(p.aimY, p.aimX);
     state.player.rootGroup.rotation.y = -aimAngle + Math.PI / 2;
@@ -394,7 +391,7 @@
     setPlayerState(stateName);
 
     const bob = stateName === 'run' ? Math.sin(performance.now() * 0.012) * 1.5 : 0;
-    state.player.rootGroup.position.y = bob;
+    state.player.rootGroup.position.y = baseYOffset + bob;
 
     if (state.player.shadow) {
       state.player.shadow.scale.setScalar(stateName === 'dash' ? 1.25 : 1);
