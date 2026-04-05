@@ -110,7 +110,7 @@ window.WARLOCK_3D_CONFIG = {
   dashHoldTime: 0.30,
   actorHeight: 45,
   modelYOffset: 0,
-  modelYOffsetMobile: -70,
+  modelYOffsetMobile: -200,
 };
 
 // ── Input State ───────────────────────────────────────────────
