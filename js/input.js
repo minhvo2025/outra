@@ -296,21 +296,20 @@ resetBtn.addEventListener('click',   () => { resetRound(); menuOpen = false; men
 
 musicToggleBtn.addEventListener('click', () => { startMusicIfNeeded(); setMusicMuted(!musicMuted); updateHud(); });
 
-toggleDummyBtn.addEventListener('click', () => {
-  dummyEnabled = !dummyEnabled;
-  if (dummyEnabled) {
-    const d = findValidSpawnNear(dummySpawn.x, dummySpawn.y, 0);
-    Object.assign(dummy, {
-      x: d.x, y: d.y, vx: 0, vy: 0,
-      hp: dummy.maxHp, alive: true, deadReason: '',
-      fireReadyAt: 0, hookReadyAt: 0,
-      aiSwitchTimer: 0, aiMoveTimer: 0, targetX: d.x, targetY: d.y
-    });
-  } else {
-    dummy.alive      = false;
-    dummy.deadReason = 'removed';
-  }
+standingDummyBtn.addEventListener('click', () => {
+  spawnDummy('standing');
   updateHud();
+});
+
+activeDummyBtn.addEventListener('click', () => {
+  spawnDummy('active');
+  updateHud();
+});
+
+removeDummyBtn.addEventListener('click', () => {
+  removeDummy();
+  updateHud();
+});
 });
 
 menuResetBindsBtn.addEventListener('click', () => {
