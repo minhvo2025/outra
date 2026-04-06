@@ -93,7 +93,7 @@ const storeItems = [
   { id: 'beanie',         type: 'hat',     name: 'Beanie',           cost: 3, description: 'Soft round cap',                        apply: (p) => p.store.beanie = true },
   { id: 'crown',          type: 'hat',     name: 'Crown',            cost: 7, description: 'Royal shiny crown',                     apply: (p) => p.store.crown = true },
   { id: 'strawHat',       type: 'hat',     name: 'Straw Hat',        cost: 5, description: 'Wide brim straw hat',                   apply: (p) => p.store.strawHat = true },
-  { id: 'sweater',        type: 'sweater', name: 'Sweater',          cost: 4, description: 'Cozy sweater',                  apply: (p) => p.store.sweater = true },
+  { id: 'sweater',        type: 'sweater', name: 'Sweater',          cost: 4, description: 'Cozy sweater',                          apply: (p) => p.store.sweater = true },
   { id: 'boots',          type: 'boots',   name: 'Boots',            cost: 4, description: 'Adventurer boots',                      apply: (p) => p.store.boots = true },
 ];
 
@@ -130,13 +130,18 @@ const skillAimPreview = { active: false, type: null, dx: 1, dy: 0 };
 // ── 3D Character Layer ───────────────────────────────────────
 window.OUTRA_3D_CONFIG = {
   enabled: true,
+
   playerCharacter: {
-    idle: 'docs/art/character/idle.glb',
-    run: 'docs/art/character/run.glb',
-    cast: 'docs/art/character/cast.glb',
-    dash: 'docs/art/character/dash.glb',
-    hit: 'docs/art/character/hit.glb',
+    glb: 'docs/art/character/Aldrion.glb',
+    animations: {
+      idle: 'Idle_4',
+      run: 'Running',
+      cast: 'mage_soell_cast_4',
+      dash: 'Shield_Push_Left',
+      hit: 'Hit_Reaction_1',
+    },
   },
+
   worldScale: 1,
   actorScale: 28,
   hoverHeight: 0,
@@ -147,6 +152,25 @@ window.OUTRA_3D_CONFIG = {
   actorHeight: 45,
   modelYOffset: 0,
   modelYOffsetMobile: -200,
+
+  previewCharacter: {
+    targetHeightDesktop: 98,
+    targetHeightMobile: 70,
+    cameraFovDesktop: 36,
+    cameraFovMobile: 40,
+    cameraYDesktop: 80,
+    cameraYMobile: 52,
+    cameraZDesktop: 380,
+    cameraZMobile: 420,
+    lookAtYDesktop: 64,
+    lookAtYMobile: 42,
+    modelYOffsetDesktop: -14,
+    modelYOffsetMobile: -8,
+    shadowScaleXDesktop: 1.7,
+    shadowScaleXMobile: 1.45,
+    shadowScaleYDesktop: 0.8,
+    shadowScaleYMobile: 0.72,
+  },
 };
 
 // ── Input State ───────────────────────────────────────────────
