@@ -87,10 +87,14 @@ const soundLose     = () => playTone('sawtooth',  180, 0.20, 0.050,  70);
 const soundHeal     = () => playTone('triangle',  520, 0.16, 0.040, 760);
 const soundShock    = () => playTone('square', 240, 0.12, 0.05, 80);
 const soundGust     = () => playTone('triangle', 540, 0.11, 0.032, 180);
+const soundWall     = () => {
+  playTone('sawtooth', 150, 0.16, 0.032, 110);
+  playTone('triangle', 220, 0.22, 0.024, 320);
+};
 const soundCharge   = () => playTone('sawtooth',  180, 0.16, 0.050, 540);
 const soundChargeHit = () => {
   playTone('square', 210, 0.09, 0.050, 120);
   playTone('triangle', 320, 0.12, 0.032, 720);
 };
 
-const soundRewind  = () => { playTone('triangle', 620, 0.10, 0.035, 260); playTone('sine', 420, 0.18, 0.025, 140); };
+const soundRewind  = () => playTone('triangle', 220, 0.16, 0.045, 120);

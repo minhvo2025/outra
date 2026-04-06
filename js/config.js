@@ -125,12 +125,6 @@ let dummyBehavior = 'active'; // 'active' | 'standing'
 let hudVisible = false;
 
 const skillAimPreview = { active: false, type: null, dx: 1, dy: 0 };
-let wallAimHeld = false;
-
-const rewindState = {
-  window: 1.0,
-  history: [],
-};
 
 
 // ── 3D Character Layer ───────────────────────────────────────
@@ -190,6 +184,7 @@ const player = {
   alive: true, deadReason: '', score: 0,
   bodyColor: colorChoices[0].body, wandColor: colorChoices[0].wand,
   aimX: 1, aimY: 0,
+  rewindSeconds: 1.0,
 };
 
 // ── Active Spell Loadout (order = slots) ─────────────────────
@@ -211,6 +206,8 @@ const obstacles   = [];
 const walls       = [];
 const hooks       = [];
 const potions     = [];
+const rewindHistory = [];
+let rewindLastSampleAt = 0;
 
 // ── Misc Timers ───────────────────────────────────────────────
 let lastTime         = performance.now();

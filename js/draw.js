@@ -377,6 +377,38 @@ function drawParticles() {
 }
 
 // ── Skill Aim Preview ─────────────────────────────────────────
+
+function getWallPreviewData() {
+  const dir = normalized(skillAimPreview.dx || player.aimX, skillAimPreview.dy || player.aimY);
+  const perp = { x: -dir.y, y: dir.x };
+  const wallLength = 150;
+  const segmentRadius = 12;
+  const segmentCount = 7;
+  const centerDistance = player.r + 42;
+  const centerX = player.x + dir.x * centerDistance;
+  const centerY = player.y + dir.y * centerDistance;
+  const segments = [];
+  let blocked = false;
+
+  for (let i = 0; i < segmentCount; i++) {
+    const t = segmentCount === 1 ? 0 : (i / (segmentCount - 1)) - 0.5;
+    const offset = t * wallLength;
+    const sx = centerX + perp.x * offset;
+    const sy = centerY + perp.y * offset;
+    const invalid = !insidePlatform(sx, sy, segmentRadius + 4) || !!circleHitsObstacle(sx, sy, segmentRadius) || distance(sx, sy, player.x, player.y) < player.r + segmentRadius + 8;
+    if (invalid) blocked = true;
+    segments.push({ x: sx, y: sy, r: segmentRadius, blocked: invalid });
+  }
+
+  return { dir, perp, centerX, centerY, halfLen: wallLength * 0.5, segments, blocked };
+}
+
+function getRewindPreviewTarget() {
+  const snap = getSafeRewindTarget(getRewindTarget(player.rewindSeconds || 1.0));
+  if (!snap) return null;
+  return snap;
+}
+
 function drawSkillAimPreview() {
   if (!skillAimPreview.active || gameState === 'lobby' || !player.alive) return;
   const dir = normalized(skillAimPreview.dx, skillAimPreview.dy);
@@ -487,50 +519,47 @@ function drawSkillAimPreview() {
     ctx.beginPath();
     ctx.arc(endX, endY, player.r + 2, 0, Math.PI * 2);
     ctx.fill();
+  } else if (skillAimPreview.type === 'wall') {
+    const preview = getWallPreviewData();
+
+    ctx.setLineDash([]);
+    ctx.strokeStyle = preview.blocked ? 'rgba(255,130,130,0.82)' : 'rgba(170,210,255,0.82)';
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    ctx.moveTo(preview.centerX - preview.perp.x * preview.halfLen, preview.centerY - preview.perp.y * preview.halfLen);
+    ctx.lineTo(preview.centerX + preview.perp.x * preview.halfLen, preview.centerY + preview.perp.y * preview.halfLen);
+    ctx.stroke();
+
+    ctx.strokeStyle = preview.blocked ? 'rgba(255,220,220,0.68)' : 'rgba(235,245,255,0.52)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(preview.centerX - preview.perp.x * preview.halfLen, preview.centerY - preview.perp.y * preview.halfLen);
+    ctx.lineTo(preview.centerX + preview.perp.x * preview.halfLen, preview.centerY + preview.perp.y * preview.halfLen);
+    ctx.stroke();
+
+    for (const seg of preview.segments) {
+      ctx.fillStyle = seg.blocked ? 'rgba(255,120,120,0.28)' : 'rgba(170,210,255,0.18)';
+      ctx.beginPath();
+      ctx.arc(seg.x, seg.y, seg.r + 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   } else if (skillAimPreview.type === 'rewind') {
-    const rawTarget = getRewindTarget();
-    const target = rawTarget ? findSafeRewindTarget(rawTarget) : null;
-    if (rawTarget) {
-      ctx.strokeStyle = target ? 'rgba(200,180,255,0.78)' : 'rgba(255,120,120,0.78)';
+    const target = getRewindPreviewTarget();
+    if (target) {
+      ctx.setLineDash([6, 8]);
+      ctx.strokeStyle = 'rgba(186,166,255,0.5)';
       ctx.beginPath();
       ctx.moveTo(player.x, player.y);
-      ctx.lineTo(rawTarget.x, rawTarget.y);
+      ctx.lineTo(target.x, target.y);
       ctx.stroke();
 
       ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(220,190,255,0.88)';
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(rawTarget.x, rawTarget.y, player.r + 8, 0, Math.PI * 2);
+      ctx.arc(target.x, target.y, player.r + 6, 0, Math.PI * 2);
       ctx.stroke();
-
-      ctx.globalAlpha = 0.12;
-      ctx.fillStyle = target ? 'rgba(190,170,255,1)' : 'rgba(255,100,100,1)';
-      ctx.beginPath();
-      ctx.arc(rawTarget.x, rawTarget.y, player.r + 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
     }
-
-  } else if (skillAimPreview.type === 'wall') {
-    const centerDistance = player.r + 42;
-    const centerX = player.x + dir.x * centerDistance;
-    const centerY = player.y + dir.y * centerDistance;
-    const perp = { x: -dir.y, y: dir.x };
-    const halfLen = 75;
-
-    ctx.setLineDash([]);
-    ctx.strokeStyle = 'rgba(170,210,255,0.82)';
-    ctx.lineWidth = 14;
-    ctx.beginPath();
-    ctx.moveTo(centerX - perp.x * halfLen, centerY - perp.y * halfLen);
-    ctx.lineTo(centerX + perp.x * halfLen, centerY + perp.y * halfLen);
-    ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(235,245,255,0.52)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(centerX - perp.x * halfLen, centerY - perp.y * halfLen);
-    ctx.lineTo(centerX + perp.x * halfLen, centerY + perp.y * halfLen);
-    ctx.stroke();
   }
 
   ctx.restore();
@@ -585,7 +614,6 @@ function render() {
   drawPotions();
   drawParticles();
   drawHooks();
-  drawWalls();
   drawProjectiles();
   if (dummyEnabled && dummy.alive) drawDummy();
   drawPlayer();

@@ -1,3 +1,4 @@
+let desktopWallPrimed = false;
 // ── Joystick Factory ──────────────────────────────────────────
 function makeStickController(stickEl, thumbEl, state) {
   const maxBase = () => Math.max(28, stickEl.clientWidth * 0.3);
@@ -185,28 +186,6 @@ function bindPullCastButton(btn, handler, skillType) {
   });
 }
 
-
-function beginKeyboardWallAim() {
-  if (isTouchDevice || wallAimHeld || gameState !== 'playing') return;
-  wallAimHeld = true;
-  skillAimPreview.active = true;
-  skillAimPreview.type = 'wall';
-  skillAimPreview.dx = player.aimX;
-  skillAimPreview.dy = player.aimY;
-}
-
-function endKeyboardWallAim() {
-  if (!wallAimHeld) return;
-  const shouldCast = gameState === 'playing';
-  wallAimHeld = false;
-  skillAimPreview.active = false;
-  skillAimPreview.type = null;
-  if (shouldCast) {
-    startMusicIfNeeded();
-    castPlayerSpell('wall');
-  }
-}
-
 // ── Keyboard ──────────────────────────────────────────────────
 window.addEventListener('keydown', (e) => {
   const norm = normalizeKey(e.key);
@@ -258,17 +237,19 @@ window.addEventListener('keydown', (e) => {
 
   if (gameState === 'playing' && norm === keybinds.wall) {
     e.preventDefault();
-    if (!e.repeat) beginKeyboardWallAim();
+    if (!desktopWallPrimed) {
+      desktopWallPrimed = true;
+      skillAimPreview.active = true;
+      skillAimPreview.type = 'wall';
+      skillAimPreview.dx = player.aimX;
+      skillAimPreview.dy = player.aimY;
+    }
   }
 
   if (gameState === 'playing' && norm === keybinds.rewind) {
     e.preventDefault();
     startMusicIfNeeded();
-    skillAimPreview.active = true;
-    skillAimPreview.type = 'rewind';
     castPlayerSpell('rewind');
-    skillAimPreview.active = false;
-    skillAimPreview.type = null;
   }
 
   if (gameState !== 'lobby' && norm === keybinds.reset) resetRound();
@@ -283,9 +264,17 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   const norm = normalizeKey(e.key);
   keys[norm] = false;
+
   if (norm === keybinds.wall) {
-    e.preventDefault();
-    endKeyboardWallAim();
+    if (desktopWallPrimed && gameState === 'playing') {
+      startMusicIfNeeded();
+      castPlayerSpell('wall');
+    }
+    desktopWallPrimed = false;
+    if (skillAimPreview.type === 'wall') {
+      skillAimPreview.active = false;
+      skillAimPreview.type = null;
+    }
   }
 });
 
@@ -298,7 +287,7 @@ canvas.addEventListener('mousemove', (e) => {
     const aim    = normalized(mouse.x - player.x, mouse.y - player.y);
     player.aimX  = aim.x;
     player.aimY  = aim.y;
-    if (wallAimHeld) {
+    if (desktopWallPrimed) {
       skillAimPreview.active = true;
       skillAimPreview.type = 'wall';
       skillAimPreview.dx = aim.x;
@@ -403,7 +392,6 @@ bindPullCastButton(mobileChargeBtn,   () => castPlayerSpell('charge'), 'charge')
 bindPullCastButton(mobileShockBtn, () => castPlayerSpell('shock'), 'shock');
 bindPullCastButton(mobileGustBtn,  () => castPlayerSpell('gust'),  'gust');
 bindPullCastButton(mobileWallBtn,  () => castPlayerSpell('wall'),  'wall');
-bindPullCastButton(mobileRewindBtn, () => castPlayerSpell('rewind'), 'rewind');
 
 // ── Window Resize ─────────────────────────────────────────────
 window.addEventListener('resize', () => {

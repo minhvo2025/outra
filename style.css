@@ -375,8 +375,8 @@ input[type="text"] {
 
 .mobileActions {
   position: relative;
-  width: 228px;
-  height: 228px;
+  width: 196px;
+  height: 196px;
   pointer-events: auto;
 }
 
@@ -419,15 +419,15 @@ input[type="text"] {
 
 .mobileBtn.subSkill { background: rgba(26,28,36,0.88); }
 
-#mobileFireBtn     { left: 71px; top: 71px; }
-#mobileHookBtn     { left: 132px; top: 8px; }
-#mobileTeleportBtn { left: 144px; top: 138px; }
-#mobileShieldBtn   { left: 18px; top: 18px; }
-#mobileChargeBtn   { left: 18px; top: 138px; }
-#mobileShockBtn    { left: 71px; top: 150px; }
-#mobileGustBtn     { left: 150px; top: 71px; }
-#mobileWallBtn     { left: 8px; top: 78px; }
-#mobileRewindBtn   { left: 78px; top: 8px; }
+#mobileFireBtn     { left: 55px; top: 55px; }
+#mobileHookBtn     { left: 118px; top: 8px; }
+#mobileTeleportBtn { left: 118px; top: 118px; }
+#mobileShieldBtn   { left: 8px; top: 8px; }
+#mobileChargeBtn   { left: 8px; top: 118px; }
+#mobileShockBtn    { left: 55px; top: 140px; }
+#mobileGustBtn     { left: 134px; top: 55px; }
+#mobileWallBtn     { left: -2px; top: 55px; }
+#mobileRewindBtn   { left: 55px; top: -2px; }
 
 .mobileBtn.aiming {
   background: rgba(255,120,60,0.95);
@@ -652,19 +652,19 @@ input[type="text"] {
   }
 
   .mobileActions {
-    width: 220px;
-    height: 220px;
+    width: 204px;
+    height: 196px;
   }
 
-  #mobileFireBtn     { left: 60px; top: 60px; }
-  #mobileHookBtn     { left: 118px; top: 2px; }
-  #mobileTeleportBtn { left: 130px; top: 128px; }
-  #mobileShieldBtn   { left: 12px; top: 12px; }
-  #mobileChargeBtn   { left: 12px; top: 128px; }
-  #mobileShockBtn    { left: 60px; top: 142px; }
-  #mobileGustBtn     { left: 138px; top: 60px; }
-  #mobileWallBtn     { left: 2px; top: 72px; }
-  #mobileRewindBtn   { left: 72px; top: 2px; }
+  #mobileFireBtn     { left: 48px; top: 48px; }
+  #mobileHookBtn     { left: 108px; top: 4px; }
+  #mobileTeleportBtn { left: 108px; top: 108px; }
+  #mobileShieldBtn   { left: 4px; top: 4px; }
+  #mobileChargeBtn   { left: 4px; top: 108px; }
+  #mobileShockBtn    { left: 48px; top: 128px; }
+  #mobileGustBtn     { left: 112px; top: 48px; }
+  #mobileWallBtn     { left: 0px; top: 48px; }
+  #mobileRewindBtn   { left: 48px; top: 0px; }
 
   .mobileBtn.big { width: 64px; height: 64px; }
   .mobileBtn.mainSkill { width: 78px; height: 78px; }
