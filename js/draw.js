@@ -487,6 +487,29 @@ function drawSkillAimPreview() {
     ctx.beginPath();
     ctx.arc(endX, endY, player.r + 2, 0, Math.PI * 2);
     ctx.fill();
+  } else if (skillAimPreview.type === 'rewind') {
+    const rawTarget = getRewindTarget();
+    const target = rawTarget ? findSafeRewindTarget(rawTarget) : null;
+    if (rawTarget) {
+      ctx.strokeStyle = target ? 'rgba(200,180,255,0.78)' : 'rgba(255,120,120,0.78)';
+      ctx.beginPath();
+      ctx.moveTo(player.x, player.y);
+      ctx.lineTo(rawTarget.x, rawTarget.y);
+      ctx.stroke();
+
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(rawTarget.x, rawTarget.y, player.r + 8, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = target ? 'rgba(190,170,255,1)' : 'rgba(255,100,100,1)';
+      ctx.beginPath();
+      ctx.arc(rawTarget.x, rawTarget.y, player.r + 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
   } else if (skillAimPreview.type === 'wall') {
     const centerDistance = player.r + 42;
     const centerX = player.x + dir.x * centerDistance;
@@ -562,6 +585,7 @@ function render() {
   drawPotions();
   drawParticles();
   drawHooks();
+  drawWalls();
   drawProjectiles();
   if (dummyEnabled && dummy.alive) drawDummy();
   drawPlayer();

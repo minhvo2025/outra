@@ -261,6 +261,16 @@ window.addEventListener('keydown', (e) => {
     if (!e.repeat) beginKeyboardWallAim();
   }
 
+  if (gameState === 'playing' && norm === keybinds.rewind) {
+    e.preventDefault();
+    startMusicIfNeeded();
+    skillAimPreview.active = true;
+    skillAimPreview.type = 'rewind';
+    castPlayerSpell('rewind');
+    skillAimPreview.active = false;
+    skillAimPreview.type = null;
+  }
+
   if (gameState !== 'lobby' && norm === keybinds.reset) resetRound();
 
   if (norm === keybinds.menu) {
@@ -393,6 +403,7 @@ bindPullCastButton(mobileChargeBtn,   () => castPlayerSpell('charge'), 'charge')
 bindPullCastButton(mobileShockBtn, () => castPlayerSpell('shock'), 'shock');
 bindPullCastButton(mobileGustBtn,  () => castPlayerSpell('gust'),  'gust');
 bindPullCastButton(mobileWallBtn,  () => castPlayerSpell('wall'),  'wall');
+bindPullCastButton(mobileRewindBtn, () => castPlayerSpell('rewind'), 'rewind');
 
 // ── Window Resize ─────────────────────────────────────────────
 window.addEventListener('resize', () => {

@@ -291,6 +291,72 @@ function healActor(actor, amount) {
 
 function getPlayerAim() { return normalized(player.aimX, player.aimY); }
 
+function recordRewindHistory() {
+  if (!player.alive || gameState === 'lobby') {
+    rewindState.history.length = 0;
+    return;
+  }
+  const now = performance.now() / 1000;
+  const hist = rewindState.history;
+  const last = hist[hist.length - 1];
+  if (!last || distance(last.x, last.y, player.x, player.y) > 6 || now - last.t > 0.06) {
+    hist.push({ x: player.x, y: player.y, t: now });
+  } else {
+    last.x = player.x;
+    last.y = player.y;
+    last.t = now;
+  }
+  while (hist.length && now - hist[0].t > rewindState.window + 0.35) hist.shift();
+}
+
+function getRewindTarget() {
+  const now = performance.now() / 1000;
+  const hist = rewindState.history;
+  if (!hist.length) return null;
+  const targetTime = now - rewindState.window;
+  let best = hist[0];
+  let bestDiff = Math.abs(hist[0].t - targetTime);
+  for (const point of hist) {
+    const diff = Math.abs(point.t - targetTime);
+    if (diff < bestDiff) {
+      best = point;
+      bestDiff = diff;
+    }
+  }
+  return { x: best.x, y: best.y };
+}
+
+function findSafeRewindTarget(rawTarget) {
+  if (!rawTarget) return null;
+  const maxDist = arena.radius - player.r;
+  const dx = rawTarget.x - arena.cx;
+  const dy = rawTarget.y - arena.cy;
+  const dist = Math.hypot(dx, dy) || 1;
+  const baseX = dist > maxDist ? arena.cx + (dx / dist) * maxDist : rawTarget.x;
+  const baseY = dist > maxDist ? arena.cy + (dy / dist) * maxDist : rawTarget.y;
+
+  const samples = [
+    { x: baseX, y: baseY },
+  ];
+  for (let ring = 1; ring <= 4; ring++) {
+    const rad = ring * 10;
+    for (let i = 0; i < 12; i++) {
+      const ang = (Math.PI * 2 * i) / 12;
+      samples.push({
+        x: baseX + Math.cos(ang) * rad,
+        y: baseY + Math.sin(ang) * rad,
+      });
+    }
+  }
+
+  for (const point of samples) {
+    if (!insidePlatform(point.x, point.y, player.r + 2)) continue;
+    if (circleHitsObstacle(point.x, point.y, player.r)) continue;
+    return point;
+  }
+  return null;
+}
+
 function damagePlayer(amount) {
   if (!player.alive) return;
   const now = performance.now() / 1000;
@@ -350,6 +416,9 @@ function castPlayerSpell(spellId) {
       break;
     case 'wall':
       castWall();
+      break;
+    case 'rewind':
+      castRewind();
       break;
   }
 }
@@ -641,6 +710,51 @@ function castWall() {
   }
 }
 
+function castRewind() {
+  const now = performance.now() / 1000;
+
+  if (
+    gameState !== 'playing' ||
+    !player.alive ||
+    now < player.rewindReadyAt
+  ) return;
+
+  const preview = getRewindTarget();
+  const target = findSafeRewindTarget(preview);
+  if (!target) return;
+
+  player.rewindReadyAt = now + player.rewindCooldown;
+  stopArcaneCharge(false);
+  if (window.outraThree && window.outraThree.triggerCast) window.outraThree.triggerCast();
+  soundRewind();
+
+  const fromX = player.x;
+  const fromY = player.y;
+
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11;
+    particles.push({
+      x: fromX + (target.x - fromX) * t,
+      y: fromY + (target.y - fromY) * t,
+      vx: (Math.random() - 0.5) * 45,
+      vy: (Math.random() - 0.5) * 45,
+      life: 0.16 + Math.random() * 0.08,
+      size: 3 + Math.random() * 2,
+      color: 'rgba(200,180,255,0.82)'
+    });
+  }
+
+  spawnBurst(fromX, fromY, 'rgba(200,180,255,0.92)', 16, 180);
+  player.x = target.x;
+  player.y = target.y;
+  player.vx = 0;
+  player.vy = 0;
+  spawnBurst(player.x, player.y, 'rgba(200,180,255,0.98)', 18, 190);
+
+  rewindState.history.length = 0;
+  rewindState.history.push({ x: player.x, y: player.y, t: now });
+}
+
 function updateArcaneCharge(dt) {
   if (!player.chargeActive || !player.alive) return;
   if (gameState !== 'playing' && gameState !== 'result') {
@@ -889,7 +1003,7 @@ function resetRound() {
   arena.shrinkTimer    = arena.shrinkInterval;
   buildObstacles();
   player.hookCooldown  = getHookCooldown();
-  activeSpellLoadout   = ['fire', 'hook', 'blink', 'shield', 'charge', 'shock', 'gust', 'wall'];
+  activeSpellLoadout   = ['fire', 'hook', 'blink', 'shield', 'charge', 'shock', 'gust', 'wall', 'rewind'];
 
   const p = findValidSpawnNear(playerSpawn.x, playerSpawn.y, 0);
   const d = findValidSpawnNear(dummySpawn.x,  dummySpawn.y,  0);
@@ -897,7 +1011,7 @@ function resetRound() {
   Object.assign(player, {
     x: p.x, y: p.y, vx: 0, vy: 0,
     hp: player.maxHp, alive: true, deadReason: '',
-    fireReadyAt: 0, hookReadyAt: 0, teleportReadyAt: 0, shieldReadyAt: 0, chargeReadyAt: 0, shockReadyAt: 0, gustReadyAt: 0, wallReadyAt: 0, shieldUntil: 0,
+    fireReadyAt: 0, hookReadyAt: 0, teleportReadyAt: 0, shieldReadyAt: 0, chargeReadyAt: 0, shockReadyAt: 0, gustReadyAt: 0, wallReadyAt: 0, rewindReadyAt: 0, shieldUntil: 0,
     chargeActive: false, chargeDirX: 0, chargeDirY: 0, chargeTimer: 0, chargeHit: false,
     aimX: 1, aimY: 0
   });
@@ -951,7 +1065,7 @@ function enterLobby() {
   player.score = getPlayerPoints(player.name);
   updateAimSensitivityUI();
   wallAimHeld = false;
-  wallAimHeld = false;
+  rewindState.history.length = 0;
   updateHud();
   refreshMobileControls();
 }
@@ -976,6 +1090,7 @@ function startMatch() {
 // ── Main Update ───────────────────────────────────────────────
 function update(dt) {
   updateMusic(dt);
+  recordRewindHistory();
 
   if (gameState === 'lobby' || menuOpen) {
     updateHud();
