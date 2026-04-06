@@ -180,43 +180,6 @@ function drawObstacles() {
   }
 }
 
-function drawWalls() {
-  for (const wall of walls) {
-    const alpha = Math.max(0.3, Math.min(1, wall.life / wall.maxLife));
-    const start = wall.segments[0];
-    const end = wall.segments[wall.segments.length - 1];
-
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = `rgba(145, 195, 255, ${0.92 * alpha})`;
-    ctx.lineWidth = 22;
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineTo(end.x, end.y);
-    ctx.stroke();
-
-    ctx.strokeStyle = `rgba(235, 245, 255, ${0.65 * alpha})`;
-    ctx.lineWidth = 10;
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineTo(end.x, end.y);
-    ctx.stroke();
-
-    for (const seg of wall.segments) {
-      ctx.fillStyle = `rgba(110, 165, 235, ${0.18 * alpha})`;
-      ctx.beginPath();
-      ctx.arc(seg.x, seg.y, seg.r + 6, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = `rgba(158, 204, 255, ${0.92 * alpha})`;
-      ctx.beginPath();
-      ctx.arc(seg.x, seg.y, seg.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-}
-
 // ── Potions ───────────────────────────────────────────────────
 function drawPotions() {
   for (const potion of potions) {
@@ -285,11 +248,16 @@ function drawActor(actor, bodyColor, wandColor, aimAngle = 0, healthColor = '#6c
 }
 
 function drawPlayer() {
-    if (window.outraThree && window.outraThree.isPlayerRenderedIn3D && window.outraThree.isPlayerRenderedIn3D()) {
-    return;
+  const using3DPlayer = window.outraThree && window.outraThree.isPlayerRenderedIn3D && window.outraThree.isPlayerRenderedIn3D();
+
+  if (!using3DPlayer) {
+    const angle = Math.atan2(player.aimY, player.aimX);
+    drawActor(player, player.alive ? player.bodyColor : '#777', player.wandColor, angle, '#62f36d', true);
+  } else {
+    // Keep HUD elements visible even when the body is rendered in Three.js.
+    drawHealthBar(player, '#62f36d');
+    drawNameTag(player);
   }
-  const angle = Math.atan2(player.aimY, player.aimX);
-  drawActor(player, player.alive ? player.bodyColor : '#777', player.wandColor, angle, '#62f36d', true);
 
   const now = performance.now() / 1000;
   if (now < player.shieldUntil) {
@@ -377,38 +345,6 @@ function drawParticles() {
 }
 
 // ── Skill Aim Preview ─────────────────────────────────────────
-
-function getWallPreviewData() {
-  const dir = normalized(skillAimPreview.dx || player.aimX, skillAimPreview.dy || player.aimY);
-  const perp = { x: -dir.y, y: dir.x };
-  const wallLength = 150;
-  const segmentRadius = 12;
-  const segmentCount = 7;
-  const centerDistance = player.r + 42;
-  const centerX = player.x + dir.x * centerDistance;
-  const centerY = player.y + dir.y * centerDistance;
-  const segments = [];
-  let blocked = false;
-
-  for (let i = 0; i < segmentCount; i++) {
-    const t = segmentCount === 1 ? 0 : (i / (segmentCount - 1)) - 0.5;
-    const offset = t * wallLength;
-    const sx = centerX + perp.x * offset;
-    const sy = centerY + perp.y * offset;
-    const invalid = !insidePlatform(sx, sy, segmentRadius + 4) || !!circleHitsObstacle(sx, sy, segmentRadius) || distance(sx, sy, player.x, player.y) < player.r + segmentRadius + 8;
-    if (invalid) blocked = true;
-    segments.push({ x: sx, y: sy, r: segmentRadius, blocked: invalid });
-  }
-
-  return { dir, perp, centerX, centerY, halfLen: wallLength * 0.5, segments, blocked };
-}
-
-function getRewindPreviewTarget() {
-  const snap = getSafeRewindTarget(getRewindTarget(player.rewindSeconds || 1.0));
-  if (!snap) return null;
-  return snap;
-}
-
 function drawSkillAimPreview() {
   if (!skillAimPreview.active || gameState === 'lobby' || !player.alive) return;
   const dir = normalized(skillAimPreview.dx, skillAimPreview.dy);
@@ -452,28 +388,28 @@ function drawSkillAimPreview() {
       : 'rgba(220,245,255,0.75)';
     ctx.stroke();
 
-} else if (skillAimPreview.type === 'shock') {
-  const len = 115;
-  const spread = 0.6;
+  } else if (skillAimPreview.type === 'shock') {
+    const len = 115;
+    const spread = 0.6;
 
-  ctx.strokeStyle = 'rgba(255,180,120,0.35)';
-  ctx.beginPath();
-  ctx.moveTo(player.x, player.y);
+    ctx.strokeStyle = 'rgba(255,180,120,0.35)';
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y);
 
-  ctx.lineTo(
-    player.x + (dir.x * Math.cos(spread) - dir.y * Math.sin(spread)) * len,
-    player.y + (dir.y * Math.cos(spread) + dir.x * Math.sin(spread)) * len
-  );
+    ctx.lineTo(
+      player.x + (dir.x * Math.cos(spread) - dir.y * Math.sin(spread)) * len,
+      player.y + (dir.y * Math.cos(spread) + dir.x * Math.sin(spread)) * len
+    );
 
-  ctx.moveTo(player.x, player.y);
+    ctx.moveTo(player.x, player.y);
 
-  ctx.lineTo(
-    player.x + (dir.x * Math.cos(-spread) - dir.y * Math.sin(-spread)) * len,
-    player.y + (dir.y * Math.cos(-spread) + dir.x * Math.sin(-spread)) * len
-  );
+    ctx.lineTo(
+      player.x + (dir.x * Math.cos(-spread) - dir.y * Math.sin(-spread)) * len,
+      player.y + (dir.y * Math.cos(-spread) + dir.x * Math.sin(-spread)) * len
+    );
 
-  ctx.stroke();
-    
+    ctx.stroke();
+
   } else if (skillAimPreview.type === 'blink') {
     const target = getBlinkTargetPreview();
 
@@ -519,47 +455,6 @@ function drawSkillAimPreview() {
     ctx.beginPath();
     ctx.arc(endX, endY, player.r + 2, 0, Math.PI * 2);
     ctx.fill();
-  } else if (skillAimPreview.type === 'wall') {
-    const preview = getWallPreviewData();
-
-    ctx.setLineDash([]);
-    ctx.strokeStyle = preview.blocked ? 'rgba(255,130,130,0.82)' : 'rgba(170,210,255,0.82)';
-    ctx.lineWidth = 14;
-    ctx.beginPath();
-    ctx.moveTo(preview.centerX - preview.perp.x * preview.halfLen, preview.centerY - preview.perp.y * preview.halfLen);
-    ctx.lineTo(preview.centerX + preview.perp.x * preview.halfLen, preview.centerY + preview.perp.y * preview.halfLen);
-    ctx.stroke();
-
-    ctx.strokeStyle = preview.blocked ? 'rgba(255,220,220,0.68)' : 'rgba(235,245,255,0.52)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(preview.centerX - preview.perp.x * preview.halfLen, preview.centerY - preview.perp.y * preview.halfLen);
-    ctx.lineTo(preview.centerX + preview.perp.x * preview.halfLen, preview.centerY + preview.perp.y * preview.halfLen);
-    ctx.stroke();
-
-    for (const seg of preview.segments) {
-      ctx.fillStyle = seg.blocked ? 'rgba(255,120,120,0.28)' : 'rgba(170,210,255,0.18)';
-      ctx.beginPath();
-      ctx.arc(seg.x, seg.y, seg.r + 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  } else if (skillAimPreview.type === 'rewind') {
-    const target = getRewindPreviewTarget();
-    if (target) {
-      ctx.setLineDash([6, 8]);
-      ctx.strokeStyle = 'rgba(186,166,255,0.5)';
-      ctx.beginPath();
-      ctx.moveTo(player.x, player.y);
-      ctx.lineTo(target.x, target.y);
-      ctx.stroke();
-
-      ctx.setLineDash([]);
-      ctx.strokeStyle = 'rgba(220,190,255,0.88)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(target.x, target.y, player.r + 6, 0, Math.PI * 2);
-      ctx.stroke();
-    }
   }
 
   ctx.restore();
@@ -610,7 +505,6 @@ function drawResultOverlay() {
 function render() {
   drawArena();
   drawObstacles();
-  drawWalls();
   drawPotions();
   drawParticles();
   drawHooks();
