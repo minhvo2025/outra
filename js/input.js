@@ -224,10 +224,15 @@ window.addEventListener('keydown', (e) => {
     castPlayerSpell('charge');
   }
 
-if (gameState === 'playing' && norm === keybinds.shock) {
-  startMusicIfNeeded();
-  castPlayerSpell('shock');
-}
+  if (gameState === 'playing' && norm === keybinds.shock) {
+    startMusicIfNeeded();
+    castPlayerSpell('shock');
+  }
+
+  if (gameState === 'playing' && norm === keybinds.gust) {
+    startMusicIfNeeded();
+    castPlayerSpell('gust');
+  }
   if (gameState !== 'lobby' && norm === keybinds.reset) resetRound();
 
   if (norm === keybinds.menu) {
@@ -345,6 +350,7 @@ bindPullCastButton(mobileTeleportBtn, () => castPlayerSpell('blink'),  'blink');
 bindPullCastButton(mobileShieldBtn,   () => castPlayerSpell('shield'), 'shield');
 bindPullCastButton(mobileChargeBtn,   () => castPlayerSpell('charge'), 'charge');
 bindPullCastButton(mobileShockBtn, () => castPlayerSpell('shock'), 'shock');
+bindPullCastButton(mobileGustBtn,  () => castPlayerSpell('gust'),  'gust');
 
 // ── Window Resize ─────────────────────────────────────────────
 window.addEventListener('resize', () => {

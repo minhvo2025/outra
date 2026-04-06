@@ -335,7 +335,10 @@ function castPlayerSpell(spellId) {
       castArcaneCharge();
       break;
     case 'shock':
-    castShockBlast();
+      castShockBlast();
+      break;
+    case 'gust':
+      castGust();
       break;
   }
 }
@@ -504,6 +507,68 @@ function castShockBlast() {
     12,
     120
   );
+}
+
+function castGust() {
+  const now = performance.now() / 1000;
+
+  if (
+    gameState !== 'playing' ||
+    !player.alive ||
+    now < player.gustReadyAt
+  ) return;
+
+  player.gustReadyAt = now + player.gustCooldown;
+
+  if (window.outraThree && window.outraThree.triggerCast) {
+    window.outraThree.triggerCast();
+  }
+
+  soundGust();
+
+  const radius = 120;
+  const damage = 4;
+  const knockback = 540;
+
+  spawnBurst(
+    player.x,
+    player.y,
+    'rgba(170,245,255,0.92)',
+    18,
+    radius * 1.7
+  );
+
+  for (let i = 0; i < 18; i++) {
+    const ang = (Math.PI * 2 * i) / 18 + Math.random() * 0.18;
+    const speed = 180 + Math.random() * 120;
+    particles.push({
+      x: player.x + Math.cos(ang) * 18,
+      y: player.y + Math.sin(ang) * 18,
+      vx: Math.cos(ang) * speed,
+      vy: Math.sin(ang) * speed,
+      life: 0.22 + Math.random() * 0.12,
+      size: 4 + Math.random() * 3,
+      color: 'rgba(170,245,255,0.82)'
+    });
+  }
+
+  if (dummyEnabled && dummy.alive) {
+    const dx = dummy.x - player.x;
+    const dy = dummy.y - player.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist <= radius + dummy.r) {
+      const dir = dist > 0.001 ? normalized(dx, dy) : getPlayerAim();
+      damageDummy(damage);
+      dummy.vx += dir.x * knockback;
+      dummy.vy += dir.y * knockback;
+      spawnBurst(dummy.x, dummy.y, 'rgba(190,250,255,0.96)', 16, 180);
+      if (dummyBehavior === 'active' && dist < 90) {
+        dummy.targetX = dummy.x + dir.x * 120;
+        dummy.targetY = dummy.y + dir.y * 120;
+      }
+    }
+  }
 }
 
 function updateArcaneCharge(dt) {
@@ -754,7 +819,7 @@ function resetRound() {
   arena.shrinkTimer    = arena.shrinkInterval;
   buildObstacles();
   player.hookCooldown  = getHookCooldown();
-  activeSpellLoadout   = ['fire', 'hook', 'blink', 'shield', 'charge', 'shock'];
+  activeSpellLoadout   = ['fire', 'hook', 'blink', 'shield', 'charge', 'shock', 'gust'];
 
   const p = findValidSpawnNear(playerSpawn.x, playerSpawn.y, 0);
   const d = findValidSpawnNear(dummySpawn.x,  dummySpawn.y,  0);
@@ -762,7 +827,7 @@ function resetRound() {
   Object.assign(player, {
     x: p.x, y: p.y, vx: 0, vy: 0,
     hp: player.maxHp, alive: true, deadReason: '',
-    fireReadyAt: 0, hookReadyAt: 0, teleportReadyAt: 0, shieldReadyAt: 0, chargeReadyAt: 0, shieldUntil: 0,
+    fireReadyAt: 0, hookReadyAt: 0, teleportReadyAt: 0, shieldReadyAt: 0, chargeReadyAt: 0, shockReadyAt: 0, gustReadyAt: 0, shieldUntil: 0,
     chargeActive: false, chargeDirX: 0, chargeDirY: 0, chargeTimer: 0, chargeHit: false,
     aimX: 1, aimY: 0
   });

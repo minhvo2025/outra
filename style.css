@@ -424,7 +424,8 @@ input[type="text"] {
 #mobileTeleportBtn { left: 118px; top: 118px; }
 #mobileShieldBtn   { left: 8px; top: 8px; }
 #mobileChargeBtn   { left: 8px; top: 118px; }
-#mobileShockBtn    { left: 55px; top: 140px; }}
+#mobileShockBtn    { left: 55px; top: 140px; }
+#mobileGustBtn     { left: 134px; top: 55px; }
 
 .mobileBtn.aiming {
   background: rgba(255,120,60,0.95);
@@ -649,8 +650,8 @@ input[type="text"] {
   }
 
   .mobileActions {
-    width: 176px;
-    height: 176px;
+    width: 204px;
+    height: 196px;
   }
 
   #mobileFireBtn     { left: 48px; top: 48px; }
