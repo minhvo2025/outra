@@ -134,11 +134,11 @@ window.OUTRA_3D_CONFIG = {
   playerCharacter: {
     glb: 'docs/art/character/Aldrion.glb',
     animations: {
-      idle: 'Idle_4',
-      run: 'Running',
-      cast: 'mage_soell_cast_4',
-      dash: 'Shield_Push_Left',
-      hit: 'Hit_Reaction_1',
+      idle: 'Shield_Push_Left',
+      run: 'Walking',
+      cast: 'Idle_4',
+      dash: 'mage_soell_cast_4',
+      hit: 'Running',
     },
   },
 
