@@ -55,19 +55,20 @@
     return null;
   }
 
-  function getCharacterConfig() {
-    const charCfg = cfg.playerCharacter || {};
-    return {
-      glb: charCfg.glb || charCfg.path || '',
-      animations: {
-        idle: charCfg.animations?.idle || 'Idle_4',
-        run: charCfg.animations?.run || 'Running',
-        cast: charCfg.animations?.cast || 'mage_soell_cast_4',
-        dash: charCfg.animations?.dash || 'Shield_Push_Left',
-        hit: charCfg.animations?.hit || 'Hit_Reaction_1',
-      },
-    };
-  }
+function getCharacterConfig() {
+  const charCfg = cfg.playerCharacter || {};
+  return {
+    glb: charCfg.glb || charCfg.path || '',
+    animations: {
+      idle: charCfg.animations?.idle || 'Shield_Push_Left',
+      walk: charCfg.animations?.walk || 'Hit_Reaction_1',
+      run: charCfg.animations?.run || 'Walking',
+      cast: charCfg.animations?.cast || 'Idle_4',
+      dash: charCfg.animations?.dash || 'mage_soell_cast_4',
+      hit: charCfg.animations?.hit || 'Running',
+    },
+  };
+}
 
   function getPreviewSettings() {
     const previewCfg = cfg.previewCharacter || {};
@@ -542,13 +543,14 @@
     const charCfg = getCharacterConfig();
     const result = new Map();
 
-    const wantedStates = {
-      idle: charCfg.animations.idle,
-      run: charCfg.animations.run,
-      cast: charCfg.animations.cast,
-      dash: charCfg.animations.dash,
-      hit: charCfg.animations.hit,
-    };
+  const wantedStates = {
+  idle: charCfg.animations.idle,
+  walk: charCfg.animations.walk,
+  run: charCfg.animations.run,
+  cast: charCfg.animations.cast,
+  dash: charCfg.animations.dash,
+  hit: charCfg.animations.hit,
+};
 
     Object.entries(wantedStates).forEach(([stateName, clipName]) => {
       if (!clipName || !mixer) return;
@@ -755,35 +757,40 @@
   }
 
   function chooseState(dt) {
-    const p = player;
-    if (!p) return 'idle';
+  const p = player;
+  if (!p) return 'idle';
 
-    if (!p.alive) return state.player.states.has('hit') ? 'hit' : 'idle';
+  if (!p.alive) return state.player.states.has('hit') ? 'hit' : 'idle';
 
-    const hpDrop = state.player.lastHp !== null && p.hp < state.player.lastHp - 0.01;
-    state.player.lastHp = p.hp;
+  const hpDrop = state.player.lastHp !== null && p.hp < state.player.lastHp - 0.01;
+  state.player.lastHp = p.hp;
 
-    if (hpDrop) state.player.hitTimer = cfg.hitHoldTime || 0.28;
-    if (p.chargeActive) state.player.dashTimer = cfg.dashHoldTime || 0.30;
+  if (hpDrop) state.player.hitTimer = cfg.hitHoldTime || 0.28;
+  if (p.chargeActive) state.player.dashTimer = cfg.dashHoldTime || 0.30;
 
-    state.player.castTimer = Math.max(0, state.player.castTimer - dt);
-    state.player.hitTimer = Math.max(0, state.player.hitTimer - dt);
-    state.player.dashTimer = Math.max(0, state.player.dashTimer - dt);
+  state.player.castTimer = Math.max(0, state.player.castTimer - dt);
+  state.player.hitTimer = Math.max(0, state.player.hitTimer - dt);
+  state.player.dashTimer = Math.max(0, state.player.dashTimer - dt);
 
-    if (state.player.hitTimer > 0 && state.player.states.has('hit')) return 'hit';
-    if (state.player.dashTimer > 0 && state.player.states.has('dash')) return 'dash';
-    if (state.player.castTimer > 0 && state.player.states.has('cast')) return 'cast';
+  if (state.player.hitTimer > 0 && state.player.states.has('hit')) return 'hit';
+  if (state.player.dashTimer > 0 && state.player.states.has('dash')) return 'dash';
+  if (state.player.castTimer > 0 && state.player.states.has('cast')) return 'cast';
 
-    const moving =
-      Math.hypot(p.vx || 0, p.vy || 0) > 20 ||
-      moveStick.active ||
-      keys[keybinds.left] ||
-      keys[keybinds.right] ||
-      keys[keybinds.up] ||
-      keys[keybinds.down];
+  const moving =
+    Math.hypot(p.vx || 0, p.vy || 0) > 20 ||
+    moveStick.active ||
+    keys[keybinds.left] ||
+    keys[keybinds.right] ||
+    keys[keybinds.up] ||
+    keys[keybinds.down];
 
-    return moving && state.player.states.has('run') ? 'run' : 'idle';
+  if (moving) {
+    if (state.player.states.has('run')) return 'run';
+    if (state.player.states.has('walk')) return 'walk';
   }
+
+  return 'idle';
+}
 
   function tintAllLoadedModelsIfNeeded() {
     const body = player?.bodyColor || '#d9d9ff';
