@@ -593,7 +593,7 @@ function castWall() {
 
   const dir = getPlayerAim();
   const perp = { x: -dir.y, y: dir.x };
-  const wallLength = 160;
+  const wallLength = 150;
   const segmentRadius = 12;
   const segmentCount = 7;
   const centerDistance = player.r + 42;
@@ -923,6 +923,7 @@ function resetRound() {
   resetMoveStick();
   skillAimPreview.active = false;
   skillAimPreview.type   = null;
+  wallAimHeld = false;
   mouse.x = player.x + 120;
   mouse.y = player.y;
 }
@@ -949,6 +950,8 @@ function enterLobby() {
   setMenuTab(activeMenuTab);
   player.score = getPlayerPoints(player.name);
   updateAimSensitivityUI();
+  wallAimHeld = false;
+  wallAimHeld = false;
   updateHud();
   refreshMobileControls();
 }

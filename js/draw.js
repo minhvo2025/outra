@@ -492,7 +492,7 @@ function drawSkillAimPreview() {
     const centerX = player.x + dir.x * centerDistance;
     const centerY = player.y + dir.y * centerDistance;
     const perp = { x: -dir.y, y: dir.x };
-    const halfLen = 80;
+    const halfLen = 75;
 
     ctx.setLineDash([]);
     ctx.strokeStyle = 'rgba(170,210,255,0.82)';

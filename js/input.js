@@ -185,6 +185,28 @@ function bindPullCastButton(btn, handler, skillType) {
   });
 }
 
+
+function beginKeyboardWallAim() {
+  if (isTouchDevice || wallAimHeld || gameState !== 'playing') return;
+  wallAimHeld = true;
+  skillAimPreview.active = true;
+  skillAimPreview.type = 'wall';
+  skillAimPreview.dx = player.aimX;
+  skillAimPreview.dy = player.aimY;
+}
+
+function endKeyboardWallAim() {
+  if (!wallAimHeld) return;
+  const shouldCast = gameState === 'playing';
+  wallAimHeld = false;
+  skillAimPreview.active = false;
+  skillAimPreview.type = null;
+  if (shouldCast) {
+    startMusicIfNeeded();
+    castPlayerSpell('wall');
+  }
+}
+
 // ── Keyboard ──────────────────────────────────────────────────
 window.addEventListener('keydown', (e) => {
   const norm = normalizeKey(e.key);
@@ -235,8 +257,8 @@ window.addEventListener('keydown', (e) => {
   }
 
   if (gameState === 'playing' && norm === keybinds.wall) {
-    startMusicIfNeeded();
-    castPlayerSpell('wall');
+    e.preventDefault();
+    if (!e.repeat) beginKeyboardWallAim();
   }
 
   if (gameState !== 'lobby' && norm === keybinds.reset) resetRound();
@@ -248,7 +270,14 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-window.addEventListener('keyup', (e) => { keys[normalizeKey(e.key)] = false; });
+window.addEventListener('keyup', (e) => {
+  const norm = normalizeKey(e.key);
+  keys[norm] = false;
+  if (norm === keybinds.wall) {
+    e.preventDefault();
+    endKeyboardWallAim();
+  }
+});
 
 // ── Mouse ─────────────────────────────────────────────────────
 canvas.addEventListener('mousemove', (e) => {
@@ -259,6 +288,12 @@ canvas.addEventListener('mousemove', (e) => {
     const aim    = normalized(mouse.x - player.x, mouse.y - player.y);
     player.aimX  = aim.x;
     player.aimY  = aim.y;
+    if (wallAimHeld) {
+      skillAimPreview.active = true;
+      skillAimPreview.type = 'wall';
+      skillAimPreview.dx = aim.x;
+      skillAimPreview.dy = aim.y;
+    }
   }
 });
 

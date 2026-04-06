@@ -119,6 +119,7 @@ let dummyBehavior = 'active'; // 'active' | 'standing'
 let hudVisible = false;
 
 const skillAimPreview = { active: false, type: null, dx: 1, dy: 0 };
+let wallAimHeld = false;
 
 
 // ── 3D Character Layer ───────────────────────────────────────
@@ -171,7 +172,7 @@ const dummySpawn  = { x: 0, y: 0 };
 // ── Player ────────────────────────────────────────────────────
 const player = {
   name: 'Player', x: 0, y: 0, vx: 0, vy: 0, r: 18, speed: 280, hp: 100, maxHp: 100,
-  fireCooldown: 0.45, hookCooldown: 1.8, teleportCooldown: 2.5, shieldCooldown: 4.5, chargeCooldown: 5.5, shockCooldown: 3.2, gustCooldown: 6.0, wallCooldown: 10.0,
+  fireCooldown: 0.45, hookCooldown: 1.8, teleportCooldown: 2.5, shieldCooldown: 4.5, chargeCooldown: 5.5, shockCooldown: 3.2, gustCooldown: 6.0, wallCooldown: 8.0,
   fireReadyAt: 0, hookReadyAt: 0, teleportReadyAt: 0, shieldReadyAt: 0, chargeReadyAt: 0, shockReadyAt: 0, gustReadyAt: 0, wallReadyAt: 0,
   teleportDistance: 150, shieldUntil: 0,
   chargeActive: false, chargeDirX: 0, chargeDirY: 0, chargeTimer: 0, chargeHit: false,
