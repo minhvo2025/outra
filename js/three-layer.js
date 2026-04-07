@@ -282,15 +282,17 @@ function prepareArenaFloorModel(root, parentGroup) {
     }
 
     const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-   mats.forEach((mat) => {
-  applyStylizedMaterial(mat);
+    mats.forEach((mat) => {
+      applyStylizedMaterial(mat);
 
-  mat.side = THREE.DoubleSide;
-  mat.transparent = true;
-  mat.opacity = floorCfg.opacity;
-  mat.depthWrite = false;
-  mat.needsUpdate = true;
-});
+      mat.side = THREE.DoubleSide;
+
+      if ('transparent' in mat || floorCfg.opacity < 0.999) {
+        mat.transparent = floorCfg.opacity < 0.999;
+        mat.opacity = floorCfg.opacity;
+        mat.needsUpdate = true;
+      }
+    });
   });
 
   // Reset transforms first
