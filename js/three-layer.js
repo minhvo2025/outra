@@ -35,7 +35,6 @@
       mixer: null,
       states: new Map(),
       currentState: 'idle',
-      baseRotation: null,
     },
     floor: {
       root: null,
@@ -54,7 +53,6 @@
       lastHp: null,
       shadow: null,
       rootGroup: null,
-      baseRotation: null,
     },
   };
 
@@ -267,38 +265,8 @@
     centerAndScaleModel(root, cfg.actorHeight || 95);
     tintModel(root, player.bodyColor, player.wandColor);
     root.visible = true;
-    state.player.baseRotation = copyEuler(root.rotation);
-    applyRootPoseCorrection(root, state.player.baseRotation, 'idle');
     parentGroup.add(root);
     log('Prepared arena model');
-  }
-
-  function copyEuler(euler) {
-    return new THREE.Euler(euler.x, euler.y, euler.z, euler.order || 'XYZ');
-  }
-
-  function getStatePoseCorrection(stateName) {
-    if (!stateName || stateName === 'idle') {
-      return { x: 0, y: 0, z: 0 };
-    }
-
-    return {
-      x: Math.PI,
-      y: 0,
-      z: 0,
-    };
-  }
-
-  function applyRootPoseCorrection(root, baseRotation, stateName) {
-    if (!root || !baseRotation) return;
-
-    const correction = getStatePoseCorrection(stateName);
-    root.rotation.set(
-      baseRotation.x + correction.x,
-      baseRotation.y + correction.y,
-      baseRotation.z + correction.z,
-      baseRotation.order || root.rotation.order
-    );
   }
 
   function preparePreviewModel(root, parentGroup) {
@@ -306,8 +274,6 @@
     centerAndScaleModel(root, previewSettings.targetHeight);
     tintModel(root, player.bodyColor, player.wandColor);
     root.visible = true;
-    state.preview.baseRotation = copyEuler(root.rotation);
-    applyRootPoseCorrection(root, state.preview.baseRotation, 'idle');
     parentGroup.add(root);
     log('Prepared preview model');
   }
@@ -714,6 +680,52 @@
     }
   }
 
+  function shouldStripRootTrack(trackName) {
+    const name = String(trackName || '').toLowerCase();
+
+    const rootNodePrefixes = [
+      'armature.',
+      'root.',
+      'scene.',
+      'character.',
+      'aldrion.',
+      'rig.',
+      'skeletonroot.',
+      'grp_',
+    ];
+
+    const isRootNodeTrack = rootNodePrefixes.some((prefix) => name.startsWith(prefix));
+
+    if (!isRootNodeTrack) return false;
+
+    return (
+      name.endsWith('.position') ||
+      name.endsWith('.quaternion') ||
+      name.endsWith('.rotation') ||
+      name.endsWith('.scale')
+    );
+  }
+
+  function sanitizeClipForState(clip, stateName) {
+    if (!clip) return clip;
+    if (stateName === 'idle') return clip;
+
+    const filteredTracks = (clip.tracks || []).filter((track) => !shouldStripRootTrack(track.name));
+
+    if (filteredTracks.length === (clip.tracks || []).length) {
+      return clip;
+    }
+
+    const sanitized = new THREE.AnimationClip(
+      clip.name,
+      clip.duration,
+      filteredTracks
+    );
+    sanitized.optimize();
+    log(`Sanitized clip "${clip.name}" for state "${stateName}" by removing root motion tracks`);
+    return sanitized;
+  }
+
   function buildAnimationStateMap(animations, mixer) {
     const charCfg = getCharacterConfig();
     const result = new Map();
@@ -729,13 +741,16 @@
 
     Object.entries(wantedStates).forEach(([stateName, clipName]) => {
       if (!clipName || !mixer) return;
-      const clip = THREE.AnimationClip.findByName(animations, clipName);
-      if (!clip) {
+
+      const originalClip = THREE.AnimationClip.findByName(animations, clipName);
+      if (!originalClip) {
         console.warn(`[Outra3D] Missing animation clip "${clipName}" for state "${stateName}"`);
         return;
       }
 
+      const clip = sanitizeClipForState(originalClip, stateName);
       const action = mixer.clipAction(clip);
+
       action.enabled = true;
       action.clampWhenFinished = false;
       action.setLoop(THREE.LoopRepeat, Infinity);
@@ -958,7 +973,6 @@
 
     if (state.player.root) {
       state.player.root.visible = true;
-      applyRootPoseCorrection(state.player.root, state.player.baseRotation, resolved || name);
     }
   }
 
@@ -971,7 +985,6 @@
 
     if (state.preview.root) {
       state.preview.root.visible = true;
-      applyRootPoseCorrection(state.preview.root, state.preview.baseRotation, resolved || name);
     }
   }
 
