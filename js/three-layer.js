@@ -991,6 +991,16 @@ function prepareArenaFloorModel(root, parentGroup) {
     return 'idle';
   }
 
+  function applyStateOrientationCorrection(stateName) {
+    if (!state.player.modelPivot) return;
+
+    // Idle already looks correct in your GLB.
+    // All other action states need an extra flip correction.
+    const needsBottomUpFix = stateName && stateName !== 'idle';
+
+    state.player.modelPivot.rotation.x = needsBottomUpFix ? Math.PI : 0;
+  }
+  
   function tintAllLoadedModelsIfNeeded() {
     const body = player?.bodyColor || '#d9d9ff';
     const wand = player?.wandColor || '#7c4dff';
@@ -1052,6 +1062,9 @@ function prepareArenaFloorModel(root, parentGroup) {
     state.player.rootGroup.rotation.y = -aimAngle + Math.PI / 2;
 
     setArenaPlayerState(stateName);
+
+    // Fix clips that show the character bottom-up.
+    applyStateOrientationCorrection(stateName);
 
     const bob = stateName === 'run' ? Math.sin(performance.now() * 0.012) * 1.5 : 0;
     state.player.rootGroup.position.y = (isTouchDevice ? mobileHeightOffset : baseHeightOffset) + bob;
