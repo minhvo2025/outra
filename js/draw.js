@@ -632,7 +632,17 @@ function drawResultOverlay() {
 
 // ── Main Render ───────────────────────────────────────────────
 function render() {
+  bgCtx.clearRect(0, 0, canvas.width, canvas.height);
+  fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+
+  // Background canvas: arena / lava only
+  ctx = bgCtx;
   drawArena();
+
+  // 3D floor renders in the middle via threeLayer
+
+  // FX canvas: everything that must stay visible above the floor
+  ctx = fxCtx;
   drawObstacles();
   drawWalls();
   drawPotions();
@@ -649,4 +659,7 @@ function render() {
   if (window.outraThree && window.outraThree.render) {
     window.outraThree.render();
   }
+
+  // Restore default drawing context
+  ctx = bgCtx;
 }
