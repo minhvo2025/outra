@@ -160,8 +160,8 @@ window.OUTRA_3D_CONFIG = {
   hitHoldTime: 0.28,
   dashHoldTime: 0.30,
   actorHeight: 45,
-  modelYOffset: 0,
-  modelYOffsetMobile: -200,
+  modelYOffset: 14,
+  modelYOffsetMobile: -186,
 
   previewCharacter: {
     targetHeightDesktop: 98,
