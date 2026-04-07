@@ -1,3 +1,4 @@
+
 // ── Three.js Character Layer ─────────────────────────────────
 (function () {
   const cfg = window.OUTRA_3D_CONFIG || {};
@@ -35,6 +36,7 @@
       mixer: null,
       states: new Map(),
       currentState: 'idle',
+      rigFixNode: null,
     },
     floor: {
       root: null,
@@ -53,8 +55,13 @@
       lastHp: null,
       shadow: null,
       rootGroup: null,
+      rigFixNode: null,
     },
   };
+
+  const NON_IDLE_FIX_QUAT = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(Math.PI, 0, 0, 'XYZ')
+  );
 
   function log(...args) {
     console.log('[Outra3D]', ...args);
@@ -261,11 +268,47 @@
     });
   }
 
+  function findRigFixNode(root) {
+    if (!root) return null;
+
+    let firstSkinnedMesh = null;
+    root.traverse((obj) => {
+      if (!firstSkinnedMesh && obj.isSkinnedMesh) {
+        firstSkinnedMesh = obj;
+      }
+    });
+
+    if (firstSkinnedMesh && firstSkinnedMesh.skeleton && firstSkinnedMesh.skeleton.bones.length) {
+      let bone = firstSkinnedMesh.skeleton.bones[0];
+      while (bone.parent && bone.parent.isBone) {
+        bone = bone.parent;
+      }
+      return bone;
+    }
+
+    let namedRig = null;
+    root.traverse((obj) => {
+      if (namedRig) return;
+      const n = String(obj.name || '').toLowerCase();
+      if (
+        n.includes('armature') ||
+        n === 'root' ||
+        n.includes('rig') ||
+        n.includes('skeleton')
+      ) {
+        namedRig = obj;
+      }
+    });
+
+    return namedRig || root;
+  }
+
   function prepareArenaModel(root, parentGroup) {
     centerAndScaleModel(root, cfg.actorHeight || 95);
     tintModel(root, player.bodyColor, player.wandColor);
     root.visible = true;
     parentGroup.add(root);
+    state.player.rigFixNode = findRigFixNode(root);
     log('Prepared arena model');
   }
 
@@ -275,6 +318,7 @@
     tintModel(root, player.bodyColor, player.wandColor);
     root.visible = true;
     parentGroup.add(root);
+    state.preview.rigFixNode = findRigFixNode(root);
     log('Prepared preview model');
   }
 
@@ -975,16 +1019,12 @@
     return 'idle';
   }
 
-  function applyModelOrientationFix(modelRoot, currentState) {
-    if (!modelRoot) return;
+  function applyRigOrientationFix(rigNode, currentState) {
+    if (!rigNode) return;
+    if (currentState === 'idle') return;
 
-    modelRoot.rotation.set(0, 0, 0);
-
-    if (currentState !== 'idle') {
-      modelRoot.rotation.x = Math.PI;
-    }
-
-    modelRoot.updateMatrixWorld(true);
+    rigNode.quaternion.multiply(NON_IDLE_FIX_QUAT);
+    rigNode.updateMatrixWorld(true);
   }
 
   function tintAllLoadedModelsIfNeeded() {
@@ -1087,7 +1127,7 @@
       state.preview.mixer.update(dt);
     }
 
-    applyModelOrientationFix(state.player.root, state.player.currentState);
+    applyRigOrientationFix(state.player.rigFixNode, state.player.currentState);
 
     if (state.debugAnim.timer > 0) {
       state.debugAnim.timer = Math.max(0, state.debugAnim.timer - dt);
