@@ -957,3 +957,52 @@ input[type="text"] {
     font-size: 11px;
   }
 }
+/* ── Premium Spell Tooltip ─────────────────────────────────── */
+.spellTooltip {
+  position: fixed;
+  z-index: 1000;
+  min-width: 210px;
+  max-width: 260px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(28,32,42,0.96), rgba(14,16,24,0.96));
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow:
+    0 16px 40px rgba(0,0,0,0.42),
+    0 0 24px rgba(90,140,255,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  pointer-events: none;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.spellTooltip.hidden {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.spellTooltipName {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 4px;
+  letter-spacing: 0.02em;
+}
+
+.spellTooltipDesc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.84);
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+
+.spellTooltipStats {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9fd0ff;
+  letter-spacing: 0.02em;
+}
