@@ -147,16 +147,23 @@ function drawArena() {
     ctx.fill();
   }
 
-  ctx.fillStyle = '#3a4047';
-  ctx.beginPath();
-  ctx.arc(arena.cx, arena.cy, arena.radius, 0, Math.PI * 2);
-  ctx.fill();
+  const has3DFloor =
+    window.outraThree &&
+    typeof window.outraThree.isArenaFloorRenderedIn3D === 'function' &&
+    window.outraThree.isArenaFloorRenderedIn3D();
 
-  ctx.strokeStyle = '#8a939e';
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.arc(arena.cx, arena.cy, arena.radius, 0, Math.PI * 2);
-  ctx.stroke();
+  if (!has3DFloor) {
+    ctx.fillStyle = '#3a4047';
+    ctx.beginPath();
+    ctx.arc(arena.cx, arena.cy, arena.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#8a939e';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(arena.cx, arena.cy, arena.radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 }
 
 // ── Obstacles ─────────────────────────────────────────────────
@@ -469,28 +476,28 @@ function drawSkillAimPreview() {
       : 'rgba(220,245,255,0.75)';
     ctx.stroke();
 
-} else if (skillAimPreview.type === 'shock') {
-  const len = 115;
-  const spread = 0.6;
+  } else if (skillAimPreview.type === 'shock') {
+    const len = 115;
+    const spread = 0.6;
 
-  ctx.strokeStyle = 'rgba(255,180,120,0.35)';
-  ctx.beginPath();
-  ctx.moveTo(player.x, player.y);
+    ctx.strokeStyle = 'rgba(255,180,120,0.35)';
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y);
 
-  ctx.lineTo(
-    player.x + (dir.x * Math.cos(spread) - dir.y * Math.sin(spread)) * len,
-    player.y + (dir.y * Math.cos(spread) + dir.x * Math.sin(spread)) * len
-  );
+    ctx.lineTo(
+      player.x + (dir.x * Math.cos(spread) - dir.y * Math.sin(spread)) * len,
+      player.y + (dir.y * Math.cos(spread) + dir.x * Math.sin(spread)) * len
+    );
 
-  ctx.moveTo(player.x, player.y);
+    ctx.moveTo(player.x, player.y);
 
-  ctx.lineTo(
-    player.x + (dir.x * Math.cos(-spread) - dir.y * Math.sin(-spread)) * len,
-    player.y + (dir.y * Math.cos(-spread) + dir.x * Math.sin(-spread)) * len
-  );
+    ctx.lineTo(
+      player.x + (dir.x * Math.cos(-spread) - dir.y * Math.sin(-spread)) * len,
+      player.y + (dir.y * Math.cos(-spread) + dir.x * Math.sin(-spread)) * len
+    );
 
-  ctx.stroke();
-    
+    ctx.stroke();
+
   } else if (skillAimPreview.type === 'blink') {
     const target = getBlinkTargetPreview();
 
