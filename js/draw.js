@@ -116,34 +116,187 @@ function drawLobbyPreview() {
 }
 
 // ── Arena ─────────────────────────────────────────────────────
-function drawArena() {
-  ctx.fillStyle = '#23140f';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+function drawLavaRingBand(innerR, outerR, fillStyle) {
+  ctx.beginPath();
+  ctx.arc(arena.cx, arena.cy, outerR, 0, Math.PI * 2);
+  ctx.arc(arena.cx, arena.cy, innerR, 0, Math.PI * 2, true);
+  ctx.closePath();
+  ctx.fillStyle = fillStyle;
+  ctx.fill();
+}
 
-  for (let i = 0; i < 55; i++) {
-    const angle = (i / 55) * Math.PI * 2 + performance.now() * 0.0002;
-    const r = arena.radius + 55 + Math.sin(i + performance.now() * 0.003) * 20;
-    const x = arena.cx + Math.cos(angle) * r;
-    const y = arena.cy + Math.sin(angle) * r;
-    ctx.fillStyle = 'rgba(255,120,30,0.14)';
+function drawLavaWaves(time) {
+  const waveCount = 96;
+
+  for (let i = 0; i < waveCount; i++) {
+    const t = i / waveCount;
+    const baseAngle = t * Math.PI * 2;
+
+    const pulseA = Math.sin(time * 1.8 + i * 0.7) * 16;
+    const pulseB = Math.sin(time * 3.1 - i * 0.45) * 8;
+    const radius = arena.radius + 48 + pulseA + pulseB;
+
+    const angle = baseAngle + Math.sin(time * 0.7 + i) * 0.06;
+    const x = arena.cx + Math.cos(angle) * radius;
+    const y = arena.cy + Math.sin(angle) * radius;
+
+    const size = 12 + Math.sin(time * 2.4 + i * 1.3) * 3;
+
+    const g = ctx.createRadialGradient(x, y, 0, x, y, Math.max(8, size * 1.8));
+    g.addColorStop(0, 'rgba(255, 238, 170, 0.34)');
+    g.addColorStop(0.35, 'rgba(255, 176, 72, 0.22)');
+    g.addColorStop(1, 'rgba(255, 90, 25, 0)');
+
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(x, y, 18, 0, Math.PI * 2);
+    ctx.arc(x, y, Math.max(8, size * 1.8), 0, Math.PI * 2);
     ctx.fill();
   }
+}
 
-  ctx.fillStyle = '#ff5f1f';
-  ctx.beginPath();
-  ctx.arc(arena.cx, arena.cy, arena.radius + 170, 0, Math.PI * 2);
-  ctx.fill();
+function drawLavaEmbers(time) {
+  const emberCount = 70;
 
-  ctx.fillStyle = '#ffaa40';
-  for (let i = 0; i < 46; i++) {
-    const angle = (i / 46) * Math.PI * 2 + performance.now() * 0.00035;
-    const r = arena.radius + 110 + Math.sin(i * 1.7 + performance.now() * 0.004) * 12;
-    const x = arena.cx + Math.cos(angle) * r;
-    const y = arena.cy + Math.sin(angle) * r;
+  for (let i = 0; i < emberCount; i++) {
+    const seed = i * 17.173;
+    const angle = (i / emberCount) * Math.PI * 2 + Math.sin(time * 0.45 + seed) * 0.08;
+
+    const ringOffset =
+      86 +
+      Math.sin(time * 1.7 + seed * 0.8) * 18 +
+      Math.cos(time * 2.6 + seed * 0.35) * 8;
+
+    const rise = (Math.sin(time * 3.4 + seed) * 0.5 + 0.5) * 18;
+    const x = arena.cx + Math.cos(angle) * (arena.radius + ringOffset);
+    const y = arena.cy + Math.sin(angle) * (arena.radius + ringOffset) - rise;
+
+    const r = 2.5 + (Math.sin(time * 4.2 + seed * 1.1) * 0.5 + 0.5) * 4.5;
+    const alpha = 0.2 + (Math.sin(time * 5.3 + seed) * 0.5 + 0.5) * 0.35;
+
+    ctx.fillStyle = `rgba(255, 225, 140, ${alpha})`;
     ctx.beginPath();
-    ctx.arc(x, y, 10, 0, Math.PI * 2);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawLavaCracks(time) {
+  const crackCount = 44;
+
+  ctx.save();
+  ctx.lineCap = 'round';
+
+  for (let i = 0; i < crackCount; i++) {
+    const a = (i / crackCount) * Math.PI * 2 + time * 0.05;
+    const inner = arena.radius + 18 + Math.sin(time * 2.2 + i * 0.9) * 7;
+    const outer = arena.radius + 92 + Math.sin(time * 1.5 + i * 0.55) * 14;
+
+    const x1 = arena.cx + Math.cos(a) * inner;
+    const y1 = arena.cy + Math.sin(a) * inner;
+    const x2 = arena.cx + Math.cos(a + Math.sin(time + i) * 0.04) * outer;
+    const y2 = arena.cy + Math.sin(a + Math.sin(time + i) * 0.04) * outer;
+
+    ctx.strokeStyle = 'rgba(255, 206, 120, 0.11)';
+    ctx.lineWidth = 2 + Math.sin(time * 2 + i) * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawLavaEdgeGlow(time) {
+  const glowR = arena.radius + 14 + Math.sin(time * 2.1) * 2;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 184, 90, 0.60)';
+  ctx.lineWidth = 10;
+  ctx.shadowColor = 'rgba(255, 120, 40, 0.55)';
+  ctx.shadowBlur = 22;
+  ctx.beginPath();
+  ctx.arc(arena.cx, arena.cy, glowR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255, 245, 200, 0.22)';
+  ctx.lineWidth = 3;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.arc(arena.cx, arena.cy, glowR - 2, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawArena() {
+  const time = performance.now() * 0.001;
+
+  // dark world base
+  const bgGrad = ctx.createRadialGradient(
+    arena.cx,
+    arena.cy,
+    Math.max(40, arena.radius * 0.2),
+    arena.cx,
+    arena.cy,
+    arena.radius + 420
+  );
+  bgGrad.addColorStop(0, '#24130f');
+  bgGrad.addColorStop(0.55, '#1b0c0a');
+  bgGrad.addColorStop(1, '#110807');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // outer lava body
+  const lavaGrad = ctx.createRadialGradient(
+    arena.cx,
+    arena.cy,
+    arena.radius + 10,
+    arena.cx,
+    arena.cy,
+    arena.radius + 210
+  );
+  lavaGrad.addColorStop(0, '#ff8d2f');
+  lavaGrad.addColorStop(0.26, '#ff6422');
+  lavaGrad.addColorStop(0.58, '#d93a12');
+  lavaGrad.addColorStop(1, '#6e1407');
+
+  drawLavaRingBand(arena.radius + 2, arena.radius + 210, lavaGrad);
+
+  // hotter inner band close to the arena edge
+  const hotBand = ctx.createRadialGradient(
+    arena.cx,
+    arena.cy,
+    arena.radius - 10,
+    arena.cx,
+    arena.cy,
+    arena.radius + 72
+  );
+  hotBand.addColorStop(0, 'rgba(255,240,180,0.00)');
+  hotBand.addColorStop(0.55, 'rgba(255,188,84,0.60)');
+  hotBand.addColorStop(1, 'rgba(255,94,28,0.00)');
+  drawLavaRingBand(arena.radius - 2, arena.radius + 72, hotBand);
+
+  // flowing movement layers
+  drawLavaWaves(time);
+  drawLavaCracks(time);
+  drawLavaEmbers(time);
+  drawLavaEdgeGlow(time);
+
+  // occasional larger magma pockets
+  for (let i = 0; i < 18; i++) {
+    const ang = (i / 18) * Math.PI * 2 + time * 0.12 + Math.sin(i * 0.8 + time) * 0.04;
+    const dist = arena.radius + 128 + Math.sin(time * 1.9 + i * 1.4) * 26;
+    const x = arena.cx + Math.cos(ang) * dist;
+    const y = arena.cy + Math.sin(ang) * dist;
+    const rr = 20 + Math.sin(time * 2.8 + i) * 5;
+
+    const pocket = ctx.createRadialGradient(x, y, 0, x, y, rr * 1.8);
+    pocket.addColorStop(0, 'rgba(255, 240, 190, 0.32)');
+    pocket.addColorStop(0.32, 'rgba(255, 176, 76, 0.22)');
+    pocket.addColorStop(1, 'rgba(255, 90, 25, 0)');
+    ctx.fillStyle = pocket;
+    ctx.beginPath();
+    ctx.arc(x, y, rr * 1.8, 0, Math.PI * 2);
     ctx.fill();
   }
 
