@@ -1119,7 +1119,20 @@
 
     state.floor.root.position.y = floorCfg.yOffset;
   }
+  
+  function updateArenaFloorEnergy(dt) {
+    if (!state.arenaFloorReady || !state.floor.root) return;
 
+    traverseMeshes(state.floor.root, (obj) => {
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach((mat) => {
+        if (mat?.userData?.floorTime) {
+          mat.userData.floorTime.value += dt;
+        }
+      });
+    });
+  }
+  
   function updateArenaPlayerPose(dt) {
     if (!state.ready || !state.player.rootGroup) return;
 
@@ -1242,8 +1255,9 @@
       }
     },
 
-    update(dt) {
+     update(dt) {
       updateArenaFloorPose();
+      updateArenaFloorEnergy(dt);
       if (!state.ready) return;
       updateArenaPlayerPose(dt);
       updatePreviewPose();
