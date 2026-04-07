@@ -253,6 +253,29 @@ function updateSkillCooldownButtons() {
     }
   });
 
+  function applySpellIconsDesktop() {
+  Object.entries(SPELL_ICONS).forEach(([key, path]) => {
+    const cell = document.getElementById(`dspell-${key}`);
+    if (!cell) return;
+
+    let img = cell.querySelector('img.spellIcon');
+    if (!img) {
+      img = document.createElement('img');
+      img.className = 'spellIcon';
+      img.style.position = 'absolute';
+      img.style.inset = '0';
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = '10px';
+      img.style.pointerEvents = 'none';
+      cell.appendChild(img);
+    }
+
+    img.src = path;
+  });
+}
+  
   // Mobile buttons
   Object.entries(skillButtons).forEach(([key, btn]) => {
     if (!btn) return;
@@ -335,7 +358,7 @@ function updateHud() {
   if (removeDummyBtn) {
     removeDummyBtn.textContent = dummyEnabled ? 'Remove Dummy' : 'No Dummy';
   }
-
+applySpellIconsDesktop();
   hudToggleBtn.textContent    = hudVisible ? 'Hide Info' : 'Show Info';
   playerNameHudEl.textContent = `Name: ${player.name}`;
   scoreHudEl.textContent      = `Score: ${player.score}`;
