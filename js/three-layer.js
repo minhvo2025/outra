@@ -57,6 +57,19 @@
       rootGroup: null,
       rigFixNode: null,
     },
+        dummy: {
+      root: null,
+      mixer: null,
+      states: new Map(),
+      currentState: 'idle',
+      castTimer: 0,
+      hitTimer: 0,
+      dashTimer: 0,
+      lastHp: null,
+      shadow: null,
+      rootGroup: null,
+      rigFixNode: null,
+    },
   };
 
   const NON_IDLE_FIX_QUAT = new THREE.Quaternion().setFromEuler(
@@ -312,6 +325,96 @@
     log('Prepared arena model');
   }
 
+    function prepareDummyModel(root, parentGroup) {
+    centerAndScaleModel(root, cfg.actorHeight || 95);
+    tintModel(root, '#ffd8b8', '#ff7a1a');
+    root.visible = true;
+    parentGroup.add(root);
+    state.dummy.rigFixNode = findRigFixNode(root);
+    log('Prepared dummy model');
+  }
+
+  function setDummyState(name, force = false) {
+    if (!state.dummy.states.size) return;
+    if (!force && state.dummy.currentState === name) return;
+
+    const resolved = playStateAction(state.dummy.states, name, force);
+    if (resolved) state.dummy.currentState = resolved;
+
+    if (state.dummy.root) {
+      state.dummy.root.visible = true;
+    }
+  }
+
+  function chooseDummyState(dt) {
+    if (!dummyEnabled || !dummy) return 'idle';
+
+    if (!dummy.alive) return state.dummy.states.has('hit') ? 'hit' : 'idle';
+
+    const hpDrop = state.dummy.lastHp !== null && dummy.hp < state.dummy.lastHp - 0.01;
+    state.dummy.lastHp = dummy.hp;
+
+    if (hpDrop) state.dummy.hitTimer = cfg.hitHoldTime || 0.28;
+
+    state.dummy.castTimer = Math.max(0, state.dummy.castTimer - dt);
+    state.dummy.hitTimer = Math.max(0, state.dummy.hitTimer - dt);
+    state.dummy.dashTimer = Math.max(0, state.dummy.dashTimer - dt);
+
+    if (state.dummy.hitTimer > 0 && state.dummy.states.has('hit')) return 'hit';
+    if (state.dummy.dashTimer > 0 && state.dummy.states.has('dash')) return 'dash';
+    if (state.dummy.castTimer > 0 && state.dummy.states.has('cast')) return 'cast';
+
+    const moving = Math.hypot(dummy.vx || 0, dummy.vy || 0) > 20;
+
+    if (moving) {
+      if (state.dummy.states.has('run')) return 'run';
+      if (state.dummy.states.has('walk')) return 'walk';
+    }
+
+    return 'idle';
+  }
+
+  function updateDummyPose(dt) {
+    if (!state.ready || !state.dummy.rootGroup) return;
+
+    state.dummy.rootGroup.visible = gameState !== 'lobby' && dummyEnabled;
+
+    if (!dummyEnabled || !dummy) return;
+
+    const pos = getWorldPosition(dummy);
+    const stateName = chooseDummyState(dt);
+
+    const baseHeightOffset = cfg.modelYOffset || 0;
+    const mobileHeightOffset = cfg.modelYOffsetMobile || 0;
+
+    const mobileBaseScreenOffsetZ = 40;
+    const mobileDriftStrength = 24;
+
+    const normalizedScreenY = ((dummy.y / canvas.height) - 0.5) * 2;
+    const mobileDynamicOffsetZ = isTouchDevice
+      ? mobileBaseScreenOffsetZ - (normalizedScreenY * mobileDriftStrength)
+      : 0;
+
+    state.dummy.rootGroup.position.set(
+      pos.x,
+      isTouchDevice ? mobileHeightOffset : baseHeightOffset,
+      pos.z + mobileDynamicOffsetZ
+    );
+
+    const aimAngle = Math.atan2(player.y - dummy.y, player.x - dummy.x);
+    state.dummy.rootGroup.rotation.y = -aimAngle + Math.PI / 2;
+
+    setDummyState(stateName);
+
+    const bob = stateName === 'run' ? Math.sin(performance.now() * 0.012) * 1.5 : 0;
+    state.dummy.rootGroup.position.y = (isTouchDevice ? mobileHeightOffset : baseHeightOffset) + bob;
+
+    if (state.dummy.shadow) {
+      state.dummy.shadow.scale.setScalar(stateName === 'dash' ? 1.25 : 1);
+      state.dummy.shadow.material.opacity = dummy.alive ? 0.22 : 0.12;
+    }
+  }
+
   function preparePreviewModel(root, parentGroup) {
     const previewSettings = getPreviewSettings();
     centerAndScaleModel(root, previewSettings.targetHeight);
@@ -510,6 +613,8 @@
 
     state.player.rootGroup = new THREE.Group();
     state.scene.add(state.player.rootGroup);
+    state.dummy.rootGroup = new THREE.Group();
+    state.scene.add(state.dummy.rootGroup);
 
     const shadowGeo = new THREE.CircleGeometry(cfg.shadowSize || 24, 32);
     const shadowMat = new THREE.MeshBasicMaterial({
@@ -523,6 +628,15 @@
     shadow.position.y = -1;
     state.player.shadow = shadow;
     state.player.rootGroup.add(shadow);
+
+        const dummyShadow = new THREE.Mesh(
+      shadowGeo.clone(),
+      shadowMat.clone()
+    );
+    dummyShadow.rotation.x = -Math.PI / 2;
+    dummyShadow.position.y = -1;
+    state.dummy.shadow = dummyShadow;
+    state.dummy.rootGroup.add(dummyShadow);
 
     const debugGeo = new THREE.BoxGeometry(24, 80, 24);
     const debugMat = new THREE.MeshBasicMaterial({
@@ -811,14 +925,53 @@
 
     let arenaLoaded = false;
     let previewLoaded = false;
+    let dummyLoaded = false;
 
-    function finalizeIfReady() {
-      if (!arenaLoaded || !previewLoaded) return;
+        state.loader.load(
+      glbUrl,
+      (gltf) => {
+        try {
+          const dummyRoot = gltf.scene;
+          prepareDummyModel(dummyRoot, state.dummy.rootGroup);
+
+          state.dummy.root = dummyRoot;
+          state.dummy.mixer = gltf.animations && gltf.animations.length
+            ? new THREE.AnimationMixer(dummyRoot)
+            : null;
+          state.dummy.states = buildAnimationStateMap(
+            gltf.animations || [],
+            state.dummy.mixer
+          );
+
+          dummyLoaded = true;
+          finalizeIfReady();
+        } catch (e) {
+          console.error('[Outra3D] Error preparing dummy model', e);
+          dummyLoaded = true;
+          finalizeIfReady();
+        }
+      },
+      undefined,
+      (error) => {
+        console.error('[Outra3D] Failed to load dummy GLB', glbUrl, error);
+        dummyLoaded = true;
+        finalizeIfReady();
+      }
+    );
+
+      function finalizeIfReady() {
+      if (!arenaLoaded || !previewLoaded || !dummyLoaded) return;
 
       if (!state.player.root || !state.player.states.size) {
         state.failed = true;
         console.error('[Outra3D] Arena model failed to load correctly.');
         return;
+      }
+              if (state.dummy.states.size) {
+        const firstDummy = state.dummy.states.has('idle')
+          ? 'idle'
+          : Array.from(state.dummy.states.keys())[0];
+        setDummyState(firstDummy, true);
       }
 
       state.ready = true;
@@ -1123,11 +1276,16 @@
       state.player.mixer.update(dt);
     }
 
+    if (state.dummy.mixer) {
+      state.dummy.mixer.update(dt);
+    }
+
     if (state.preview.mixer) {
       state.preview.mixer.update(dt);
     }
 
     applyRigOrientationFix(state.player.rigFixNode, state.player.currentState);
+    applyRigOrientationFix(state.dummy.rigFixNode, state.dummy.currentState);
 
     if (state.debugAnim.timer > 0) {
       state.debugAnim.timer = Math.max(0, state.debugAnim.timer - dt);
@@ -1179,10 +1337,11 @@
       }
     },
 
-    update(dt) {
+      update(dt) {
       updateArenaFloorPose();
       if (!state.ready) return;
       updateArenaPlayerPose(dt);
+      updateDummyPose(dt);
       updatePreviewPose();
       updateMixers(dt);
     },
@@ -1214,6 +1373,10 @@
       return !!state.ready;
     },
 
+        isDummyRenderedIn3D() {
+      return !!state.ready && !!dummyEnabled && !!state.dummy.root;
+    },
+    
     isArenaFloorRenderedIn3D() {
       return !!state.arenaFloorReady;
     },
@@ -1222,6 +1385,18 @@
       if (!state.ready || !state.player.states.has('cast')) return;
       state.player.castTimer = cfg.castHoldTime || 0.22;
       setArenaPlayerState('cast', true);
+    },
+
+        triggerDummyCast() {
+      if (!state.ready || !state.dummy.states.has('cast')) return;
+      state.dummy.castTimer = cfg.castHoldTime || 0.22;
+      setDummyState('cast', true);
+    },
+
+    triggerDummyHit() {
+      if (!state.ready || !state.dummy.states.has('hit')) return;
+      state.dummy.hitTimer = cfg.hitHoldTime || 0.28;
+      setDummyState('hit', true);
     },
 
     triggerDash() {
