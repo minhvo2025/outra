@@ -146,7 +146,7 @@ arenaFloor: {
   enabled: true,
   glb: 'docs/Objects/floor.glb',
   yOffset: -6,
-  opacity: 0.42,
+  opacity: 1,
   lockRotationX: 0,
   lockRotationY: 0,
   lockRotationZ: 0,
