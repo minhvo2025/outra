@@ -222,9 +222,165 @@
     });
   }
 
-  function tintModel(root, bodyColorHex, wandColorHex) {
-    // Preserve original imported colors/textures completely.
+function tintModel(root, bodyColorHex, wandColorHex) {
+  if (!root || typeof THREE === 'undefined') return;
+
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const bodyTarget = new THREE.Color(bodyColorHex || '#d9d9ff');
+  const wandTarget = new THREE.Color(wandColorHex || '#7c4dff');
+
+  function isLikelySkinTone(color) {
+    const hsl = { h: 0, s: 0, l: 0 };
+    color.getHSL(hsl);
+
+    const warmHue =
+      (hsl.h >= 0.02 && hsl.h <= 0.12) ||
+      (hsl.h >= 0.95 && hsl.h <= 1.0);
+
+    return warmHue && hsl.s >= 0.18 && hsl.s <= 0.75 && hsl.l >= 0.30 && hsl.l <= 0.88;
   }
+
+  function isLikelyNeutral(color) {
+    const hsl = { h: 0, s: 0, l: 0 };
+    color.getHSL(hsl);
+    return hsl.s < 0.10 || hsl.l < 0.08;
+  }
+
+  function getTargetType(meshName, matName, baseColor) {
+    const name = `${meshName || ''} ${matName || ''}`.toLowerCase();
+
+    // Explicit wand / staff detection first
+    if (
+      name.includes('wand') ||
+      name.includes('staff') ||
+      name.includes('weapon') ||
+      name.includes('rod')
+    ) {
+      return 'wand';
+    }
+
+    // Preserve obvious face / skin / hair / eyes / metallic bits
+    if (
+      name.includes('skin') ||
+      name.includes('face') ||
+      name.includes('head') ||
+      name.includes('hair') ||
+      name.includes('eye') ||
+      name.includes('brow') ||
+      name.includes('lash') ||
+      name.includes('mouth') ||
+      name.includes('tooth') ||
+      name.includes('teeth') ||
+      name.includes('hand') ||
+      name.includes('finger') ||
+      name.includes('metal') ||
+      name.includes('gold') ||
+      name.includes('iron') ||
+      name.includes('steel') ||
+      name.includes('buckle') ||
+      name.includes('belt')
+    ) {
+      return null;
+    }
+
+    // Explicit outfit names
+    if (
+      name.includes('robe') ||
+      name.includes('cloth') ||
+      name.includes('outfit') ||
+      name.includes('body') ||
+      name.includes('torso') ||
+      name.includes('chest') ||
+      name.includes('cape') ||
+      name.includes('cloak') ||
+      name.includes('hood') ||
+      name.includes('coat') ||
+      name.includes('sleeve') ||
+      name.includes('garment')
+    ) {
+      return 'body';
+    }
+
+    // Heuristic fallback:
+    // recolor saturated non-skin materials, which is usually the robe/outfit.
+    if (!baseColor) return null;
+    if (isLikelyNeutral(baseColor)) return null;
+    if (isLikelySkinTone(baseColor)) return null;
+
+    const hsl = { h: 0, s: 0, l: 0 };
+    baseColor.getHSL(hsl);
+
+    if (hsl.s >= 0.18 && hsl.l >= 0.14 && hsl.l <= 0.88) {
+      return 'body';
+    }
+
+    return null;
+  }
+
+  function tintSingleMaterial(mat, meshName) {
+    if (!mat || !mat.color) return;
+
+    if (!mat.userData._outraBaseColor) {
+      mat.userData._outraBaseColor = mat.color.clone();
+    }
+    if ('emissive' in mat && mat.emissive && !mat.userData._outraBaseEmissive) {
+      mat.userData._outraBaseEmissive = mat.emissive.clone();
+    }
+
+    const baseColor = mat.userData._outraBaseColor.clone();
+    const targetType = getTargetType(meshName, mat.name, baseColor);
+
+    // Reset non-tinted materials to original imported look
+    if (!targetType) {
+      mat.color.copy(mat.userData._outraBaseColor);
+      if ('emissive' in mat && mat.emissive && mat.userData._outraBaseEmissive) {
+        mat.emissive.copy(mat.userData._outraBaseEmissive);
+      }
+      mat.needsUpdate = true;
+      return;
+    }
+
+    const target = targetType === 'wand' ? wandTarget : bodyTarget;
+
+    const baseHSL = { h: 0, s: 0, l: 0 };
+    const targetHSL = { h: 0, s: 0, l: 0 };
+    baseColor.getHSL(baseHSL);
+    target.getHSL(targetHSL);
+
+    // Keep original brightness/shading, but move hue strongly toward selected color
+    const out = new THREE.Color();
+    out.setHSL(
+      targetHSL.h,
+      clamp(baseHSL.s * 0.30 + targetHSL.s * 0.85, 0.20, 1.0),
+      clamp(baseHSL.l * 0.82 + targetHSL.l * 0.22, 0.16, 0.82)
+    );
+
+    mat.color.copy(out);
+
+    if ('emissive' in mat && mat.emissive) {
+      if (mat.userData._outraBaseEmissive) {
+        mat.emissive.copy(mat.userData._outraBaseEmissive);
+      } else {
+        mat.emissive.setRGB(0, 0, 0);
+      }
+
+      // Tiny color push so magical parts still feel connected to chosen color
+      mat.emissive.lerp(target, targetType === 'wand' ? 0.16 : 0.08);
+    }
+
+    mat.needsUpdate = true;
+  }
+
+  traverseMeshes(root, (obj) => {
+    if (!obj.material) return;
+
+    if (Array.isArray(obj.material)) {
+      obj.material.forEach((mat) => tintSingleMaterial(mat, obj.name || ''));
+    } else {
+      tintSingleMaterial(obj.material, obj.name || '');
+    }
+  });
+}
 
   function centerAndScaleModel(root, targetHeightOverride) {
     traverseMeshes(root, (obj) => {
