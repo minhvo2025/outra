@@ -21,7 +21,6 @@
       camera: null,
       renderer: null,
       rootGroup: null,
-      modelPivot: null,
       shadow: null,
       ready: false,
       currentRotationY: Math.PI * 0.9,
@@ -41,7 +40,6 @@
     },
     player: {
       root: null,
-      modelPivot: null,
       mixer: null,
       states: new Map(),
       currentState: 'idle',
@@ -218,17 +216,12 @@
     box.getCenter(center);
     box.getSize(size);
 
-    let correctiveRotationX = 0;
-
-    // Detect Z-up authored model, but do NOT leave this correction
-    // on the animated root itself. Clips can overwrite root rotation.
     if (size.y < size.z) {
-      correctiveRotationX = -Math.PI / 2;
-      root.rotation.x = correctiveRotationX;
+      root.rotation.x = -Math.PI / 2;
       box = computeBox(root);
       box.getCenter(center);
       box.getSize(size);
-      log('Detected Z-up model, using parent pivot correction');
+      log('Auto-rotated model from Z-up to Y-up');
     }
 
     root.position.sub(center);
@@ -249,51 +242,28 @@
 
     root.position.y += (size.y * 0.5) + (cfg.hoverHeight || 0);
 
-    // Reset animated root back to neutral.
-    // The persistent correction will live on a parent pivot group instead.
-    root.rotation.x = 0;
-
     log('Prepared model size:', {
       x: size.x.toFixed(2),
       y: size.y.toFixed(2),
       z: size.z.toFixed(2),
       scale: scale.toFixed(2),
-      correctiveRotationX: correctiveRotationX.toFixed(3),
     });
-
-    return {
-      correctiveRotationX,
-    };
   }
 
-    function prepareArenaModel(root, parentGroup) {
-    const prep = centerAndScaleModel(root, cfg.actorHeight || 95);
+  function prepareArenaModel(root, parentGroup) {
+    centerAndScaleModel(root, cfg.actorHeight || 95);
     tintModel(root, player.bodyColor, player.wandColor);
     root.visible = true;
-
-    const pivot = new THREE.Group();
-    pivot.rotation.x = prep.correctiveRotationX || 0;
-    pivot.add(root);
-
-    parentGroup.add(pivot);
-    state.player.modelPivot = pivot;
-
+    parentGroup.add(root);
     log('Prepared arena model');
   }
 
   function preparePreviewModel(root, parentGroup) {
     const previewSettings = getPreviewSettings();
-    const prep = centerAndScaleModel(root, previewSettings.targetHeight);
+    centerAndScaleModel(root, previewSettings.targetHeight);
     tintModel(root, player.bodyColor, player.wandColor);
     root.visible = true;
-
-    const pivot = new THREE.Group();
-    pivot.rotation.x = prep.correctiveRotationX || 0;
-    pivot.add(root);
-
-    parentGroup.add(pivot);
-    state.preview.modelPivot = pivot;
-
+    parentGroup.add(root);
     log('Prepared preview model');
   }
 
@@ -991,16 +961,6 @@ function prepareArenaFloorModel(root, parentGroup) {
     return 'idle';
   }
 
-  function applyStateOrientationCorrection(stateName) {
-    if (!state.player.modelPivot) return;
-
-    // Idle already looks correct in your GLB.
-    // All other action states need an extra flip correction.
-    const needsBottomUpFix = stateName && stateName !== 'idle';
-
-    state.player.modelPivot.rotation.x = needsBottomUpFix ? Math.PI : 0;
-  }
-  
   function tintAllLoadedModelsIfNeeded() {
     const body = player?.bodyColor || '#d9d9ff';
     const wand = player?.wandColor || '#7c4dff';
@@ -1062,9 +1022,6 @@ function prepareArenaFloorModel(root, parentGroup) {
     state.player.rootGroup.rotation.y = -aimAngle + Math.PI / 2;
 
     setArenaPlayerState(stateName);
-
-    // Fix clips that show the character bottom-up.
-    applyStateOrientationCorrection(stateName);
 
     const bob = stateName === 'run' ? Math.sin(performance.now() * 0.012) * 1.5 : 0;
     state.player.rootGroup.position.y = (isTouchDevice ? mobileHeightOffset : baseHeightOffset) + bob;
