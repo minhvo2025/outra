@@ -186,6 +186,32 @@ function bindPullCastButton(btn, handler, skillType) {
   });
 }
 
+function applySpellIconsMobile() {
+  Object.entries(skillButtons).forEach(([key, btn]) => {
+    if (!btn) return;
+
+    let img = btn.querySelector('img.spellIcon');
+    if (!img) {
+      img = document.createElement('img');
+      img.className = 'spellIcon';
+      img.style.position = 'absolute';
+      img.style.inset = '0';
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = '50%';
+      img.style.pointerEvents = 'none';
+      btn.appendChild(img);
+    }
+
+    if (SPELL_ICONS[key]) {
+      img.src = SPELL_ICONS[key];
+    }
+  });
+}
+
+applySpellIconsMobile();
+
 // ── Keyboard ──────────────────────────────────────────────────
 window.addEventListener('keydown', (e) => {
   const norm = normalizeKey(e.key);
