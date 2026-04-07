@@ -267,72 +267,71 @@
     log('Prepared preview model');
   }
 
-  function prepareArenaFloorModel(root, parentGroup) {
-    const floorCfg = getArenaFloorConfig();
+ function prepareArenaFloorModel(root, parentGroup) {
+  const floorCfg = getArenaFloorConfig();
 
-    traverseMeshes(root, (obj) => {
-      obj.castShadow = false;
-      obj.receiveShadow = false;
-      obj.frustumCulled = false;
+  traverseMeshes(root, (obj) => {
+    obj.castShadow = false;
+    obj.receiveShadow = false;
+    obj.frustumCulled = false;
 
-      if (Array.isArray(obj.material)) {
-        obj.material = obj.material.map(cloneMaterial);
-      } else if (obj.material) {
-        obj.material = cloneMaterial(obj.material);
-      }
-
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-      mats.forEach((mat) => {
-        applyStylizedMaterial(mat);
-        if ('transparent' in mat || floorCfg.opacity < 0.999) {
-          mat.transparent = floorCfg.opacity < 0.999;
-          mat.opacity = floorCfg.opacity;
-          mat.needsUpdate = true;
-        }
-      });
-    });
-
-    let box = computeBox(root);
-    let center = new THREE.Vector3();
-    let size = new THREE.Vector3();
-    box.getCenter(center);
-    box.getSize(size);
-
-    if (size.y < size.z) {
-      root.rotation.x = -Math.PI / 2;
-      box = computeBox(root);
-      box.getCenter(center);
-      box.getSize(size);
-      log('Auto-rotated floor from Z-up to Y-up');
+    if (Array.isArray(obj.material)) {
+      obj.material = obj.material.map(cloneMaterial);
+    } else if (obj.material) {
+      obj.material = cloneMaterial(obj.material);
     }
 
-    root.position.sub(center);
-
-    box = computeBox(root);
-    box.getCenter(center);
-    box.getSize(size);
-
-    const sourceDiameter = Math.max(size.x || 1, size.z || 1, 1);
-    const targetDiameter = Math.max((arena.baseRadius || arena.radius || 200) * 2, 1);
-    const scale = targetDiameter / sourceDiameter;
-
-    root.scale.setScalar(scale);
-
-    root.rotation.x += floorCfg.lockRotationX;
-    root.rotation.y += floorCfg.lockRotationY;
-    root.rotation.z += floorCfg.lockRotationZ;
-    root.position.y += floorCfg.yOffset;
-
-    state.floor.baseScale = scale;
-    state.floor.sourceDiameter = sourceDiameter;
-    parentGroup.add(root);
-
-    log('Prepared arena floor', {
-      sourceDiameter: sourceDiameter.toFixed(2),
-      targetDiameter: targetDiameter.toFixed(2),
-      baseScale: scale.toFixed(3),
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    mats.forEach((mat) => {
+      applyStylizedMaterial(mat);
+      if ('transparent' in mat || floorCfg.opacity < 0.999) {
+        mat.transparent = floorCfg.opacity < 0.999;
+        mat.opacity = floorCfg.opacity;
+        mat.needsUpdate = true;
+      }
     });
-  }
+  });
+
+  // Reset any imported rotation first
+  root.rotation.set(0, 0, 0);
+
+  // Force the floor to lie flat on the arena
+  root.rotation.x = -Math.PI / 2;
+
+  // Center it
+  let box = computeBox(root);
+  let center = new THREE.Vector3();
+  let size = new THREE.Vector3();
+  box.getCenter(center);
+  box.getSize(size);
+
+  root.position.sub(center);
+
+  // Recompute after centering
+  box = computeBox(root);
+  box.getCenter(center);
+  box.getSize(size);
+
+  const sourceDiameter = Math.max(size.x || 1, size.z || 1, 1);
+  const targetDiameter = Math.max((arena.baseRadius || arena.radius || 200) * 2, 1);
+  const scale = targetDiameter / sourceDiameter;
+
+  root.scale.setScalar(scale);
+
+  root.position.y = floorCfg.yOffset;
+  root.rotation.y += floorCfg.lockRotationY || 0;
+  root.rotation.z += floorCfg.lockRotationZ || 0;
+
+  state.floor.baseScale = scale;
+  state.floor.sourceDiameter = sourceDiameter;
+  parentGroup.add(root);
+
+  log('Prepared arena floor', {
+    sourceDiameter: sourceDiameter.toFixed(2),
+    targetDiameter: targetDiameter.toFixed(2),
+    baseScale: scale.toFixed(3),
+  });
+}
 
   function initScene() {
     state.container = document.getElementById('threeLayer');
