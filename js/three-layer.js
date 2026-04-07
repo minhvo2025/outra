@@ -13,6 +13,10 @@
     debugBox: null,
     lastTintKey: '',
     arenaFloorReady: false,
+    debugAnim: {
+      text: '',
+      timer: 0,
+    },
     preview: {
       host: null,
       canvas2d: null,
@@ -54,6 +58,12 @@
 
   function log(...args) {
     console.log('[Outra3D]', ...args);
+  }
+
+  function showAnimationDebug(clipName) {
+    if (!clipName) return;
+    state.debugAnim.text = clipName;
+    state.debugAnim.timer = 1.0;
   }
 
   function getGLTFLoaderClass() {
@@ -670,68 +680,7 @@
     }
   }
 
-  function collectRootLikeNames(root, animations) {
-    const names = new Set();
-
-    // Top-level children are common animation targets in exported GLBs
-    root.children.forEach((child) => {
-      if (child && child.name) names.add(child.name);
-    });
-
-    // Typical root/armature names
-    root.traverse((obj) => {
-      if (!obj || !obj.name) return;
-      if (/armature|root|rig|hips|pelvis/i.test(obj.name)) {
-        names.add(obj.name);
-      }
-    });
-
-    // Also inspect track paths and grab the left-most node names
-    (animations || []).forEach((clip) => {
-      (clip.tracks || []).forEach((track) => {
-        const full = track.name || '';
-        const nodeName = full.split('.')[0];
-        if (nodeName && /armature|root|rig|hips|pelvis/i.test(nodeName)) {
-          names.add(nodeName);
-        }
-      });
-    });
-
-    return Array.from(names);
-  }
-
-  function sanitizeClipForArena(root, clip, stateName, rootLikeNames) {
-    if (!clip) return clip;
-    if (stateName === 'idle') return clip;
-
-    const cloned = clip.clone();
-    const blocked = new Set(rootLikeNames || []);
-
-    cloned.tracks = (cloned.tracks || []).filter((track) => {
-      const trackName = track.name || '';
-      const nodeName = trackName.split('.')[0];
-      const property = trackName.split('.').slice(1).join('.').toLowerCase();
-
-      if (!blocked.has(nodeName)) return true;
-
-      // Remove root motion / root rotation tracks from non-idle clips.
-      // This is the most likely source of bottom-up flips and floor sinking.
-      if (
-        property.includes('position') ||
-        property.includes('quaternion') ||
-        property.includes('rotation') ||
-        property.includes('scale')
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-
-    return cloned;
-  }
-
-  function buildAnimationStateMap(animations, mixer, root, isArena = false) {
+  function buildAnimationStateMap(animations, mixer) {
     const charCfg = getCharacterConfig();
     const result = new Map();
 
@@ -744,23 +693,13 @@
       hit: charCfg.animations.hit,
     };
 
-    const rootLikeNames = isArena ? collectRootLikeNames(root, animations) : [];
-
-    if (isArena && rootLikeNames.length) {
-      log('Sanitizing arena clips for root-like nodes:', rootLikeNames);
-    }
-
     Object.entries(wantedStates).forEach(([stateName, clipName]) => {
       if (!clipName || !mixer) return;
-      const originalClip = THREE.AnimationClip.findByName(animations, clipName);
-      if (!originalClip) {
+      const clip = THREE.AnimationClip.findByName(animations, clipName);
+      if (!clip) {
         console.warn(`[Outra3D] Missing animation clip "${clipName}" for state "${stateName}"`);
         return;
       }
-
-      const clip = isArena
-        ? sanitizeClipForArena(root, originalClip, stateName, rootLikeNames)
-        : originalClip;
 
       const action = mixer.clipAction(clip);
       action.enabled = true;
@@ -873,9 +812,7 @@
             : null;
           state.player.states = buildAnimationStateMap(
             gltf.animations || [],
-            state.player.mixer,
-            arenaRoot,
-            true
+            state.player.mixer
           );
 
           arenaLoaded = true;
@@ -905,9 +842,7 @@
             : null;
           state.preview.states = buildAnimationStateMap(
             gltf.animations || [],
-            state.preview.mixer,
-            previewRoot,
-            false
+            state.preview.mixer
           );
 
           previewLoaded = true;
@@ -979,7 +914,13 @@
     if (!force && state.player.currentState === name) return;
 
     const resolved = playStateAction(state.player.states, name, force);
-    if (resolved) state.player.currentState = resolved;
+    if (resolved) {
+      state.player.currentState = resolved;
+      const entry = state.player.states.get(resolved);
+      if (entry && entry.clipName) {
+        showAnimationDebug(entry.clipName);
+      }
+    }
 
     if (state.player.root) {
       state.player.root.visible = true;
@@ -1133,6 +1074,44 @@
     if (state.preview.mixer) {
       state.preview.mixer.update(dt);
     }
+
+    if (state.debugAnim.timer > 0) {
+      state.debugAnim.timer = Math.max(0, state.debugAnim.timer - dt);
+    }
+  }
+
+  function renderAnimationDebugLabel() {
+    if (gameState === 'lobby') return;
+    if (!state.debugAnim.text || state.debugAnim.timer <= 0) return;
+    if (!state.camera || !state.player.rootGroup) return;
+
+    const screen = getWorldPosition(player);
+    const liftY = 90;
+    const vector = new THREE.Vector3(
+      screen.x,
+      (cfg.modelYOffset || 0) + liftY,
+      screen.z
+    );
+
+    vector.project(state.camera);
+
+    const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    const drawCtx = document.getElementById('gameFx')?.getContext('2d');
+    if (!drawCtx) return;
+
+    drawCtx.save();
+    drawCtx.textAlign = 'center';
+    drawCtx.font = 'bold 16px Arial';
+    drawCtx.lineWidth = 4;
+    drawCtx.strokeStyle = 'rgba(0,0,0,0.75)';
+    drawCtx.fillStyle = '#ffffff';
+    drawCtx.strokeText(state.debugAnim.text, x, y - 40);
+    drawCtx.fillText(state.debugAnim.text, x, y - 40);
+    drawCtx.restore();
   }
 
   window.outraThree = {
@@ -1168,6 +1147,7 @@
 
       if (state.renderer && state.scene && state.camera) {
         state.renderer.render(state.scene, state.camera);
+        renderAnimationDebugLabel();
       }
     },
 
