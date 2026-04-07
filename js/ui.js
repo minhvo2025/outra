@@ -20,6 +20,129 @@ function prettyKey(key) {
   return key.length === 1 ? key.toUpperCase() : key.charAt(0).toUpperCase() + key.slice(1);
 }
 
+// ── Spell Tooltip Data ────────────────────────────────────────
+const SPELL_TOOLTIP_DATA = {
+  fire: {
+    name: 'Fireblast',
+    desc: 'Fast fire projectile',
+    stats: '20 dmg • long range • knockback',
+  },
+  hook: {
+    name: 'Hook',
+    desc: 'Pulls enemy to you',
+    stats: '20 dmg • 150 range',
+  },
+  blink: {
+    name: 'Blink',
+    desc: 'Instant short teleport',
+    stats: '150 range • mobility',
+  },
+  shield: {
+    name: 'Shield',
+    desc: 'Blocks damage briefly',
+    stats: '1.0s shield • defensive',
+  },
+  charge: {
+    name: 'Arcane Charge',
+    desc: 'Dash forward with impact',
+    stats: '16 dmg • 150 range',
+  },
+  shock: {
+    name: 'Shock Blast',
+    desc: 'Front cone burst',
+    stats: '14 dmg • 115 range',
+  },
+  gust: {
+    name: 'Gust',
+    desc: 'Push enemies around you',
+    stats: '4 dmg • 120 radius',
+  },
+  wall: {
+    name: 'Wall',
+    desc: 'Creates temporary barrier',
+    stats: '150 width • blocks path',
+  },
+  rewind: {
+    name: 'Rewind',
+    desc: 'Return to old position',
+    stats: '1.0s rewind • no heal',
+  },
+};
+
+let spellTooltipEl = null;
+
+function ensureSpellTooltip() {
+  if (spellTooltipEl && document.body.contains(spellTooltipEl)) return spellTooltipEl;
+
+  spellTooltipEl = document.createElement('div');
+  spellTooltipEl.id = 'spellTooltip';
+  spellTooltipEl.className = 'spellTooltip hidden';
+  spellTooltipEl.innerHTML = `
+    <div class="spellTooltipName"></div>
+    <div class="spellTooltipDesc"></div>
+    <div class="spellTooltipStats"></div>
+  `;
+  document.body.appendChild(spellTooltipEl);
+  return spellTooltipEl;
+}
+
+function showSpellTooltip(spellId, x, y) {
+  const tooltip = ensureSpellTooltip();
+  const data = SPELL_TOOLTIP_DATA[spellId];
+  if (!data) return;
+
+  tooltip.querySelector('.spellTooltipName').textContent = data.name;
+  tooltip.querySelector('.spellTooltipDesc').textContent = data.desc;
+  tooltip.querySelector('.spellTooltipStats').textContent = data.stats;
+
+  tooltip.classList.remove('hidden');
+  positionSpellTooltip(x, y);
+}
+
+function positionSpellTooltip(x, y) {
+  const tooltip = ensureSpellTooltip();
+  const pad = 14;
+
+  const rect = tooltip.getBoundingClientRect();
+  let left = x - rect.width / 2;
+  let top = y - rect.height - 18;
+
+  if (left < pad) left = pad;
+  if (left + rect.width > window.innerWidth - pad) left = window.innerWidth - rect.width - pad;
+  if (top < pad) top = y + 18;
+
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function hideSpellTooltip() {
+  if (!spellTooltipEl) return;
+  spellTooltipEl.classList.add('hidden');
+}
+
+function bindDesktopSpellTooltips() {
+  Object.keys(SPELL_TOOLTIP_DATA).forEach((spellId) => {
+    const cell = document.getElementById(`dspell-${spellId}`);
+    if (!cell || cell.dataset.tooltipBound === '1') return;
+
+    cell.dataset.tooltipBound = '1';
+
+    cell.addEventListener('mouseenter', (e) => {
+      if (isTouchDevice) return;
+      showSpellTooltip(spellId, e.clientX, e.clientY);
+    });
+
+    cell.addEventListener('mousemove', (e) => {
+      if (isTouchDevice) return;
+      positionSpellTooltip(e.clientX, e.clientY);
+    });
+
+    cell.addEventListener('mouseleave', () => {
+      hideSpellTooltip();
+    });
+  });
+}
+
 // ── Tab Switching ─────────────────────────────────────────────
 function setMenuTab(tab) {
   activeMenuTab = tab;
@@ -265,6 +388,8 @@ function applySpellIconsDesktop() {
 
     img.src = path;
   });
+
+  bindDesktopSpellTooltips();
 }
 
 // ── HUD ───────────────────────────────────────────────────────
