@@ -225,41 +225,12 @@
 function tintModel(root, bodyColorHex, wandColorHex) {
   if (!root || typeof THREE === 'undefined') return;
 
-  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
   const bodyTarget = new THREE.Color(bodyColorHex || '#d9d9ff');
   const wandTarget = new THREE.Color(wandColorHex || '#7c4dff');
 
-  function isLikelySkinTone(color) {
-    const hsl = { h: 0, s: 0, l: 0 };
-    color.getHSL(hsl);
-
-    const warmHue =
-      (hsl.h >= 0.02 && hsl.h <= 0.12) ||
-      (hsl.h >= 0.95 && hsl.h <= 1.0);
-
-    return warmHue && hsl.s >= 0.18 && hsl.s <= 0.75 && hsl.l >= 0.30 && hsl.l <= 0.88;
-  }
-
-  function isLikelyNeutral(color) {
-    const hsl = { h: 0, s: 0, l: 0 };
-    color.getHSL(hsl);
-    return hsl.s < 0.10 || hsl.l < 0.08;
-  }
-
-  function getTargetType(meshName, matName, baseColor) {
+  function shouldPreserveMaterial(meshName, matName, mat) {
     const name = `${meshName || ''} ${matName || ''}`.toLowerCase();
 
-    // Explicit wand / staff detection first
-    if (
-      name.includes('wand') ||
-      name.includes('staff') ||
-      name.includes('weapon') ||
-      name.includes('rod')
-    ) {
-      return 'wand';
-    }
-
-    // Preserve obvious face / skin / hair / eyes / metallic bits
     if (
       name.includes('skin') ||
       name.includes('face') ||
@@ -270,54 +241,44 @@ function tintModel(root, bodyColorHex, wandColorHex) {
       name.includes('lash') ||
       name.includes('mouth') ||
       name.includes('tooth') ||
-      name.includes('teeth') ||
-      name.includes('hand') ||
-      name.includes('finger') ||
-      name.includes('metal') ||
-      name.includes('gold') ||
-      name.includes('iron') ||
-      name.includes('steel') ||
-      name.includes('buckle') ||
-      name.includes('belt')
+      name.includes('teeth')
     ) {
-      return null;
+      return true;
     }
 
-    // Explicit outfit names
-    if (
-      name.includes('robe') ||
-      name.includes('cloth') ||
-      name.includes('outfit') ||
-      name.includes('body') ||
-      name.includes('torso') ||
-      name.includes('chest') ||
-      name.includes('cape') ||
-      name.includes('cloak') ||
-      name.includes('hood') ||
-      name.includes('coat') ||
-      name.includes('sleeve') ||
-      name.includes('garment')
-    ) {
-      return 'body';
+    // Also preserve very skin-like peach materials automatically
+    if (mat && mat.color) {
+      const hsl = { h: 0, s: 0, l: 0 };
+      mat.color.getHSL(hsl);
+
+      const warmHue =
+        (hsl.h >= 0.02 && hsl.h <= 0.12) ||
+        (hsl.h >= 0.95 && hsl.h <= 1.0);
+
+      const looksLikeSkin =
+        warmHue &&
+        hsl.s >= 0.18 &&
+        hsl.s <= 0.75 &&
+        hsl.l >= 0.35 &&
+        hsl.l <= 0.88;
+
+      if (looksLikeSkin) return true;
     }
 
-    // Heuristic fallback:
-    // recolor saturated non-skin materials, which is usually the robe/outfit.
-    if (!baseColor) return null;
-    if (isLikelyNeutral(baseColor)) return null;
-    if (isLikelySkinTone(baseColor)) return null;
-
-    const hsl = { h: 0, s: 0, l: 0 };
-    baseColor.getHSL(hsl);
-
-    if (hsl.s >= 0.18 && hsl.l >= 0.14 && hsl.l <= 0.88) {
-      return 'body';
-    }
-
-    return null;
+    return false;
   }
 
-  function tintSingleMaterial(mat, meshName) {
+  function isWandMaterial(meshName, matName) {
+    const name = `${meshName || ''} ${matName || ''}`.toLowerCase();
+    return (
+      name.includes('wand') ||
+      name.includes('staff') ||
+      name.includes('weapon') ||
+      name.includes('rod')
+    );
+  }
+
+  function tintSingleMaterial(mat, meshName, obj) {
     if (!mat || !mat.color) return;
 
     if (!mat.userData._outraBaseColor) {
@@ -327,11 +288,11 @@ function tintModel(root, bodyColorHex, wandColorHex) {
       mat.userData._outraBaseEmissive = mat.emissive.clone();
     }
 
-    const baseColor = mat.userData._outraBaseColor.clone();
-    const targetType = getTargetType(meshName, mat.name, baseColor);
+    const preserve = shouldPreserveMaterial(meshName, mat.name, mat);
+    const wand = isWandMaterial(meshName, mat.name);
+    const target = wand ? wandTarget : bodyTarget;
 
-    // Reset non-tinted materials to original imported look
-    if (!targetType) {
+    if (preserve) {
       mat.color.copy(mat.userData._outraBaseColor);
       if ('emissive' in mat && mat.emissive && mat.userData._outraBaseEmissive) {
         mat.emissive.copy(mat.userData._outraBaseEmissive);
@@ -340,32 +301,24 @@ function tintModel(root, bodyColorHex, wandColorHex) {
       return;
     }
 
-    const target = targetType === 'wand' ? wandTarget : bodyTarget;
+    // Force visible tint even on textured materials
+    mat.color.copy(target);
 
-    const baseHSL = { h: 0, s: 0, l: 0 };
-    const targetHSL = { h: 0, s: 0, l: 0 };
-    baseColor.getHSL(baseHSL);
-    target.getHSL(targetHSL);
+    // Optional: for meshes that still ignore color too much, remove the map tint blocker
+    // while keeping skin/face untouched.
+    if (mat.map) {
+      mat.map.colorSpace = THREE.SRGBColorSpace || mat.map.colorSpace;
+    }
 
-    // Keep original brightness/shading, but move hue strongly toward selected color
-    const out = new THREE.Color();
-    out.setHSL(
-      targetHSL.h,
-      clamp(baseHSL.s * 0.30 + targetHSL.s * 0.85, 0.20, 1.0),
-      clamp(baseHSL.l * 0.82 + targetHSL.l * 0.22, 0.16, 0.82)
-    );
-
-    mat.color.copy(out);
+    if ('metalness' in mat) mat.metalness = 0.0;
+    if ('roughness' in mat) mat.roughness = Math.max(mat.roughness ?? 0, 0.82);
+    if ('envMapIntensity' in mat) mat.envMapIntensity = 0.0;
 
     if ('emissive' in mat && mat.emissive) {
-      if (mat.userData._outraBaseEmissive) {
-        mat.emissive.copy(mat.userData._outraBaseEmissive);
-      } else {
-        mat.emissive.setRGB(0, 0, 0);
+      mat.emissive.copy(target).multiplyScalar(wand ? 0.20 : 0.05);
+      if ('emissiveIntensity' in mat) {
+        mat.emissiveIntensity = wand ? 1.1 : 0.35;
       }
-
-      // Tiny color push so magical parts still feel connected to chosen color
-      mat.emissive.lerp(target, targetType === 'wand' ? 0.16 : 0.08);
     }
 
     mat.needsUpdate = true;
@@ -375,9 +328,9 @@ function tintModel(root, bodyColorHex, wandColorHex) {
     if (!obj.material) return;
 
     if (Array.isArray(obj.material)) {
-      obj.material.forEach((mat) => tintSingleMaterial(mat, obj.name || ''));
+      obj.material.forEach((mat) => tintSingleMaterial(mat, obj.name || '', obj));
     } else {
-      tintSingleMaterial(obj.material, obj.name || '');
+      tintSingleMaterial(obj.material, obj.name || '', obj);
     }
   });
 }
@@ -1342,7 +1295,8 @@ function tintModel(root, bodyColorHex, wandColorHex) {
     const tintKey = `${body}|${wand}`;
 
     if (tintKey === state.lastTintKey) return;
-    state.lastTintKey = tintKey;
+state.lastTintKey = tintKey;
+console.log('[Outra3D] Applying tint key:', tintKey);
 
     if (state.player.root) tintModel(state.player.root, body, wand);
     if (state.preview.root) tintModel(state.preview.root, body, wand);
