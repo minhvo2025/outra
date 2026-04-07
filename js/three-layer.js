@@ -998,7 +998,7 @@ function prepareArenaFloorModel(root, parentGroup) {
     // All other action states need an extra flip correction.
     const needsBottomUpFix = stateName && stateName !== 'idle';
 
-    state.player.modelPivot.rotation.x = needsBottomUpFix ? -Math.PI : 0;
+    state.player.modelPivot.rotation.z = needsBottomUpFix ? Math.PI : 0;
   }
   
   function tintAllLoadedModelsIfNeeded() {
