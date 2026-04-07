@@ -147,7 +147,7 @@ window.OUTRA_3D_CONFIG = {
     glb: 'docs/Objects/floor.glb',
     yOffset: -6,
     opacity: 1,
-    lockRotationX: Math.PI / 2,
+    lockRotationX: 0,
     lockRotationY: 0,
     lockRotationZ: 0,
   },
