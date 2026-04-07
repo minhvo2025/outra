@@ -406,7 +406,7 @@ function updateHud() {
 
   musicToggleBtn.textContent = `Music: ${musicMuted ? 'Off' : 'On'}`;
   musicToggleBtn.className = musicMuted ? 'musicToggleOff' : 'musicToggleOn';
-  hud.style.display = (gameState !== 'lobby' && hudVisible) ? 'block' : 'block';
+  hud.style.display = (gameState !== 'lobby' && hudVisible) ? 'block' : 'none';
 
   const spellBar = document.getElementById('desktopSpellBar');
   if (spellBar) spellBar.style.display = (gameState !== 'lobby' && !isTouchDevice) ? 'flex' : 'none';
