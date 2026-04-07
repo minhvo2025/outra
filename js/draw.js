@@ -496,8 +496,20 @@ function drawPlayer() {
 }
 
 function drawDummy() {
-  const angle = Math.atan2(player.y - dummy.y, player.x - dummy.x);
-  drawActor(dummy, dummy.alive ? '#ffd8b8' : '#666', '#ff7a1a', angle, '#ff8c5a', false);
+  const is3DDummy =
+    window.outraThree &&
+    window.outraThree.isDummyRenderedIn3D &&
+    window.outraThree.isDummyRenderedIn3D();
+
+  // Always keep HP + name visible
+  drawHealthBar(dummy, '#ff8c5a');
+  drawNameTag(dummy);
+
+  // Only draw 2D fallback if 3D dummy is not active
+  if (!is3DDummy) {
+    const angle = Math.atan2(player.y - dummy.y, player.x - dummy.x);
+    drawActor(dummy, dummy.alive ? '#ffd8b8' : '#666', '#ff7a1a', angle, '#ff8c5a', false);
+  }
 }
 
 // ── Projectiles ───────────────────────────────────────────────
