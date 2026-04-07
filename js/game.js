@@ -216,6 +216,10 @@ function updateActorPhysics(actor, dt) {
 function resizeCanvas() {
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
+
+  fxCanvas.width  = window.innerWidth;
+  fxCanvas.height = window.innerHeight;
+
   updateArenaGeometry(true);
 }
 

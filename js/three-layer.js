@@ -12,6 +12,7 @@
     failed: false,
     debugBox: null,
     lastTintKey: '',
+    arenaFloorReady: false,
     preview: {
       host: null,
       canvas2d: null,
@@ -30,6 +31,12 @@
       mixer: null,
       states: new Map(),
       currentState: 'idle',
+    },
+    floor: {
+      root: null,
+      rootGroup: null,
+      baseScale: 1,
+      sourceDiameter: 1,
     },
     player: {
       root: null,
@@ -55,20 +62,33 @@
     return null;
   }
 
-function getCharacterConfig() {
-  const charCfg = cfg.playerCharacter || {};
-  return {
-    glb: charCfg.glb || charCfg.path || '',
-    animations: {
-      idle: charCfg.animations?.idle || 'Shield_Push_Left',
-      walk: charCfg.animations?.walk || 'Hit_Reaction_1',
-      run: charCfg.animations?.run || 'Walking',
-      cast: charCfg.animations?.cast || 'Idle_4',
-      dash: charCfg.animations?.dash || 'mage_soell_cast_4',
-      hit: charCfg.animations?.hit || 'Running',
-    },
-  };
-}
+  function getCharacterConfig() {
+    const charCfg = cfg.playerCharacter || {};
+    return {
+      glb: charCfg.glb || charCfg.path || '',
+      animations: {
+        idle: charCfg.animations?.idle || 'Shield_Push_Left',
+        walk: charCfg.animations?.walk || 'Hit_Reaction_1',
+        run: charCfg.animations?.run || 'Walking',
+        cast: charCfg.animations?.cast || 'Idle_4',
+        dash: charCfg.animations?.dash || 'mage_soell_cast_4',
+        hit: charCfg.animations?.hit || 'Running',
+      },
+    };
+  }
+
+  function getArenaFloorConfig() {
+    const floorCfg = cfg.arenaFloor || {};
+    return {
+      enabled: floorCfg.enabled !== false,
+      glb: floorCfg.glb || '',
+      yOffset: typeof floorCfg.yOffset === 'number' ? floorCfg.yOffset : -6,
+      opacity: typeof floorCfg.opacity === 'number' ? floorCfg.opacity : 1,
+      lockRotationX: typeof floorCfg.lockRotationX === 'number' ? floorCfg.lockRotationX : 0,
+      lockRotationY: typeof floorCfg.lockRotationY === 'number' ? floorCfg.lockRotationY : 0,
+      lockRotationZ: typeof floorCfg.lockRotationZ === 'number' ? floorCfg.lockRotationZ : 0,
+    };
+  }
 
   function getPreviewSettings() {
     const previewCfg = cfg.previewCharacter || {};
@@ -247,6 +267,122 @@ function getCharacterConfig() {
     log('Prepared preview model');
   }
 
+function prepareArenaFloorModel(root, parentGroup) {
+  const floorCfg = getArenaFloorConfig();
+
+  traverseMeshes(root, (obj) => {
+    obj.castShadow = false;
+    obj.receiveShadow = false;
+    obj.frustumCulled = false;
+
+    if (Array.isArray(obj.material)) {
+      obj.material = obj.material.map(cloneMaterial);
+    } else if (obj.material) {
+      obj.material = cloneMaterial(obj.material);
+    }
+
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+   mats.forEach((mat) => {
+  applyStylizedMaterial(mat);
+
+  // 👇 DARKEN FLOOR
+  if (mat.color) {
+    mat.color.multiplyScalar(floorCfg.brightness ?? 0.2);
+  }
+
+  mat.side = THREE.DoubleSide;
+  mat.transparent = false;
+  mat.opacity = 1;
+  mat.depthWrite = true;
+
+  mat.needsUpdate = true;
+});
+  });
+
+  // Reset transforms first
+  root.position.set(0, 0, 0);
+  root.rotation.set(0, 0, 0);
+  root.scale.set(1, 1, 1);
+
+  // Try multiple orientations and choose the one that makes the model
+  // flattest on Y (best candidate for a top-down floor)
+  const candidates = [
+    { x: 0, y: 0, z: 0, name: 'none' },
+    { x: Math.PI / 2, y: 0, z: 0, name: '+x90' },
+    { x: -Math.PI / 2, y: 0, z: 0, name: '-x90' },
+    { x: 0, y: 0, z: Math.PI / 2, name: '+z90' },
+    { x: 0, y: 0, z: -Math.PI / 2, name: '-z90' },
+    { x: Math.PI, y: 0, z: 0, name: 'x180' },
+    { x: 0, y: 0, z: Math.PI, name: 'z180' },
+    { x: Math.PI / 2, y: 0, z: Math.PI / 2, name: '+x90+z90' },
+    { x: Math.PI / 2, y: 0, z: -Math.PI / 2, name: '+x90-z90' },
+    { x: -Math.PI / 2, y: 0, z: Math.PI / 2, name: '-x90+z90' },
+    { x: -Math.PI / 2, y: 0, z: -Math.PI / 2, name: '-x90-z90' },
+  ];
+
+  let best = null;
+
+  for (const c of candidates) {
+    root.rotation.set(c.x, c.y, c.z);
+
+    const box = computeBox(root);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+
+    // We want a floor: very small Y thickness, large X/Z footprint
+    const thickness = Math.max(size.y, 0.0001);
+    const footprint = Math.max(size.x * size.z, 0.0001);
+    const score = footprint / thickness;
+
+    if (!best || score > best.score) {
+      best = { ...c, score, size: size.clone() };
+    }
+  }
+
+  // Apply best auto orientation + any user config offsets
+  root.rotation.set(
+    best.x + (floorCfg.lockRotationX || 0),
+    best.y + (floorCfg.lockRotationY || 0),
+    best.z + (floorCfg.lockRotationZ || 0)
+  );
+
+  // Center after final orientation
+  let box = computeBox(root);
+  let center = new THREE.Vector3();
+  let size = new THREE.Vector3();
+  box.getCenter(center);
+  box.getSize(size);
+
+  root.position.sub(center);
+
+  // Recompute after centering
+  box = computeBox(root);
+  box.getCenter(center);
+  box.getSize(size);
+
+  const sourceDiameter = Math.max(size.x || 1, size.z || 1, 1);
+  const targetDiameter = Math.max((arena.baseRadius || arena.radius || 200) * 2, 1);
+  const scale = targetDiameter / sourceDiameter;
+
+  root.scale.setScalar(scale);
+  root.position.y += floorCfg.yOffset;
+
+  state.floor.baseScale = scale;
+  state.floor.sourceDiameter = sourceDiameter;
+  parentGroup.add(root);
+
+  log('Prepared arena floor', {
+    chosenRotation: best.name,
+    sourceSize: {
+      x: size.x.toFixed(2),
+      y: size.y.toFixed(2),
+      z: size.z.toFixed(2),
+    },
+    targetDiameter: targetDiameter.toFixed(2),
+    baseScale: scale.toFixed(3),
+  });
+}
+
   function initScene() {
     state.container = document.getElementById('threeLayer');
 
@@ -322,6 +458,9 @@ function getCharacterConfig() {
     state.scene.add(fill);
 
     state.loader = new LoaderClass();
+
+    state.floor.rootGroup = new THREE.Group();
+    state.scene.add(state.floor.rootGroup);
 
     state.player.rootGroup = new THREE.Group();
     state.scene.add(state.player.rootGroup);
@@ -543,14 +682,14 @@ function getCharacterConfig() {
     const charCfg = getCharacterConfig();
     const result = new Map();
 
-  const wantedStates = {
-  idle: charCfg.animations.idle,
-  walk: charCfg.animations.walk,
-  run: charCfg.animations.run,
-  cast: charCfg.animations.cast,
-  dash: charCfg.animations.dash,
-  hit: charCfg.animations.hit,
-};
+    const wantedStates = {
+      idle: charCfg.animations.idle,
+      walk: charCfg.animations.walk,
+      run: charCfg.animations.run,
+      cast: charCfg.animations.cast,
+      dash: charCfg.animations.dash,
+      hit: charCfg.animations.hit,
+    };
 
     Object.entries(wantedStates).forEach(([stateName, clipName]) => {
       if (!clipName || !mixer) return;
@@ -586,6 +725,32 @@ function getCharacterConfig() {
     }
 
     return result;
+  }
+
+  function loadArenaFloor() {
+    const floorCfg = getArenaFloorConfig();
+    if (!floorCfg.enabled || !floorCfg.glb || !state.loader || !state.floor.rootGroup) {
+      return;
+    }
+
+    state.loader.load(
+      floorCfg.glb,
+      (gltf) => {
+        try {
+          const floorRoot = gltf.scene;
+          prepareArenaFloorModel(floorRoot, state.floor.rootGroup);
+          state.floor.root = floorRoot;
+          state.arenaFloorReady = true;
+          log('Arena floor ready');
+        } catch (e) {
+          console.error('[Outra3D] Error preparing arena floor', e);
+        }
+      },
+      undefined,
+      (error) => {
+        console.error('[Outra3D] Failed to load arena floor GLB', floorCfg.glb, error);
+      }
+    );
   }
 
   function loadCharacterStates() {
@@ -689,16 +854,20 @@ function getCharacterConfig() {
     );
   }
 
-  function getWorldPosition(actor) {
+  function getWorldPositionFromCoords(x, y) {
     const worldScale = cfg.worldScale || 1;
 
     const centerX = canvas.width * 0.5;
     const centerY = canvas.height * 0.5;
 
     return {
-      x: (actor.x - centerX) * worldScale,
-      z: (actor.y - centerY) * worldScale,
+      x: (x - centerX) * worldScale,
+      z: (y - centerY) * worldScale,
     };
+  }
+
+  function getWorldPosition(actor) {
+    return getWorldPositionFromCoords(actor.x, actor.y);
   }
 
   function playStateAction(map, stateName, force = false) {
@@ -757,40 +926,40 @@ function getCharacterConfig() {
   }
 
   function chooseState(dt) {
-  const p = player;
-  if (!p) return 'idle';
+    const p = player;
+    if (!p) return 'idle';
 
-  if (!p.alive) return state.player.states.has('hit') ? 'hit' : 'idle';
+    if (!p.alive) return state.player.states.has('hit') ? 'hit' : 'idle';
 
-  const hpDrop = state.player.lastHp !== null && p.hp < state.player.lastHp - 0.01;
-  state.player.lastHp = p.hp;
+    const hpDrop = state.player.lastHp !== null && p.hp < state.player.lastHp - 0.01;
+    state.player.lastHp = p.hp;
 
-  if (hpDrop) state.player.hitTimer = cfg.hitHoldTime || 0.28;
-  if (p.chargeActive) state.player.dashTimer = cfg.dashHoldTime || 0.30;
+    if (hpDrop) state.player.hitTimer = cfg.hitHoldTime || 0.28;
+    if (p.chargeActive) state.player.dashTimer = cfg.dashHoldTime || 0.30;
 
-  state.player.castTimer = Math.max(0, state.player.castTimer - dt);
-  state.player.hitTimer = Math.max(0, state.player.hitTimer - dt);
-  state.player.dashTimer = Math.max(0, state.player.dashTimer - dt);
+    state.player.castTimer = Math.max(0, state.player.castTimer - dt);
+    state.player.hitTimer = Math.max(0, state.player.hitTimer - dt);
+    state.player.dashTimer = Math.max(0, state.player.dashTimer - dt);
 
-  if (state.player.hitTimer > 0 && state.player.states.has('hit')) return 'hit';
-  if (state.player.dashTimer > 0 && state.player.states.has('dash')) return 'dash';
-  if (state.player.castTimer > 0 && state.player.states.has('cast')) return 'cast';
+    if (state.player.hitTimer > 0 && state.player.states.has('hit')) return 'hit';
+    if (state.player.dashTimer > 0 && state.player.states.has('dash')) return 'dash';
+    if (state.player.castTimer > 0 && state.player.states.has('cast')) return 'cast';
 
-  const moving =
-    Math.hypot(p.vx || 0, p.vy || 0) > 20 ||
-    moveStick.active ||
-    keys[keybinds.left] ||
-    keys[keybinds.right] ||
-    keys[keybinds.up] ||
-    keys[keybinds.down];
+    const moving =
+      Math.hypot(p.vx || 0, p.vy || 0) > 20 ||
+      moveStick.active ||
+      keys[keybinds.left] ||
+      keys[keybinds.right] ||
+      keys[keybinds.up] ||
+      keys[keybinds.down];
 
-  if (moving) {
-    if (state.player.states.has('run')) return 'run';
-    if (state.player.states.has('walk')) return 'walk';
+    if (moving) {
+      if (state.player.states.has('run')) return 'run';
+      if (state.player.states.has('walk')) return 'walk';
+    }
+
+    return 'idle';
   }
-
-  return 'idle';
-}
 
   function tintAllLoadedModelsIfNeeded() {
     const body = player?.bodyColor || '#d9d9ff';
@@ -802,6 +971,24 @@ function getCharacterConfig() {
 
     if (state.player.root) tintModel(state.player.root, body, wand);
     if (state.preview.root) tintModel(state.preview.root, body, wand);
+  }
+
+  function updateArenaFloorPose() {
+    if (!state.arenaFloorReady || !state.floor.rootGroup || !state.floor.root) return;
+
+    const pos = getWorldPositionFromCoords(arena.cx, arena.cy);
+    const baseRadius = Math.max(arena.baseRadius || arena.radius || 1, 1);
+    const currentRadius = Math.max(arena.radius || baseRadius, 1);
+    const radiusRatio = currentRadius / baseRadius;
+    const floorCfg = getArenaFloorConfig();
+
+    state.floor.rootGroup.visible = gameState !== 'lobby';
+    state.floor.rootGroup.position.set(pos.x, 0, pos.z);
+
+    const scale = Math.max(0.001, state.floor.baseScale * radiusRatio);
+    state.floor.root.scale.setScalar(scale);
+
+    state.floor.root.position.y = floorCfg.yOffset;
   }
 
   function updateArenaPlayerPose(dt) {
@@ -880,10 +1067,14 @@ function getCharacterConfig() {
       if (!cfg.enabled) return;
       initScene();
       initPreviewScene();
-      if (!state.failed) loadCharacterStates();
+      if (!state.failed) {
+        loadArenaFloor();
+        loadCharacterStates();
+      }
     },
 
     update(dt) {
+      updateArenaFloorPose();
       if (!state.ready) return;
       updateArenaPlayerPose(dt);
       updatePreviewPose();
@@ -914,6 +1105,10 @@ function getCharacterConfig() {
 
     isPlayerRenderedIn3D() {
       return !!state.ready;
+    },
+
+    isArenaFloorRenderedIn3D() {
+      return !!state.arenaFloorReady;
     },
 
     triggerCast() {

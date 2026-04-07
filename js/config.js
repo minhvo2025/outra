@@ -142,6 +142,17 @@ window.OUTRA_3D_CONFIG = {
     },
   },
 
+  arenaFloor: {
+    enabled: true,
+    glb: 'docs/Objects/floor.glb',
+    yOffset: -6,
+    opacity: 1,
+    brightness: 0.1,
+    lockRotationX: 0,
+    lockRotationY: 0,
+    lockRotationZ: 0,
+  },
+
   worldScale: 1,
   actorScale: 28,
   hoverHeight: 0,
@@ -150,8 +161,8 @@ window.OUTRA_3D_CONFIG = {
   hitHoldTime: 0.28,
   dashHoldTime: 0.30,
   actorHeight: 45,
-  modelYOffset: 0,
-  modelYOffsetMobile: -200,
+  modelYOffset: 14,
+  modelYOffsetMobile: 14,
 
   previewCharacter: {
     targetHeightDesktop: 98,
@@ -240,7 +251,12 @@ let potionSpawnTimer = 6;
 
 // ── DOM References ────────────────────────────────────────────
 const canvas        = document.getElementById('game');
-const ctx           = canvas.getContext('2d');
+let ctx             = canvas.getContext('2d');
+const bgCtx         = ctx;
+
+const fxCanvas      = document.getElementById('gameFx');
+const fxCtx         = fxCanvas.getContext('2d');
+
 const previewCanvas = document.getElementById('previewCanvas');
 const previewCtx    = previewCanvas.getContext('2d');
 
