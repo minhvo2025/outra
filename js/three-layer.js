@@ -287,7 +287,7 @@ function prepareArenaFloorModel(root, parentGroup) {
 
   // 👇 DARKEN FLOOR
   if (mat.color) {
-    mat.color.multiplyScalar(floorCfg.brightness ?? 2.1);
+    mat.color.multiplyScalar(floorCfg.brightness ?? 1);
   }
 
   mat.side = THREE.DoubleSide;
