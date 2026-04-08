@@ -387,14 +387,6 @@ function renderStore() {
   );
 }
 
-  storeList.querySelectorAll('[data-wear-id]').forEach(btn =>
-    btn.addEventListener('click', () => equipItem(btn.getAttribute('data-wear-id')))
-  );
-  storeList.querySelectorAll('[data-unwear-id]').forEach(btn =>
-    btn.addEventListener('click', () => unwearItem(btn.getAttribute('data-unwear-id')))
-  );
-}
-
 // ── Spell Icons ───────────────────────────────────────────────
 function applySpellIconsDesktop() {
   Object.entries(SPELL_ICONS).forEach(([key, path]) => {
