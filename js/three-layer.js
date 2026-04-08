@@ -71,7 +71,7 @@
     },
   };
 
-  const ARENA_MODEL_BASE_EULER = new THREE.Euler(Math.PI, 0, 0, 'XYZ');
+ const ARENA_MODEL_BASE_EULER = new THREE.Euler(0, 0, 0, 'XYZ');
 
   function log(...args) {
     console.log('[Outra3D]', ...args);
@@ -433,33 +433,31 @@
     return namedRig || root;
   }
 
-  function applyArenaModelBaseRotation(root) {
-    if (!root) return;
-    root.rotation.x += ARENA_MODEL_BASE_EULER.x;
-    root.rotation.y += ARENA_MODEL_BASE_EULER.y;
-    root.rotation.z += ARENA_MODEL_BASE_EULER.z;
-    root.updateMatrixWorld(true);
-  }
+function applyArenaModelBaseRotation(root) {
+  if (!root) return;
+  root.rotation.set(0, 0, 0);
+  root.updateMatrixWorld(true);
+}
 
-  function prepareArenaModel(root, parentGroup) {
-    centerAndScaleModel(root, cfg.actorHeight || 95);
-    applyArenaModelBaseRotation(root);
-    tintModel(root, player.bodyColor, player.wandColor);
-    root.visible = true;
-    parentGroup.add(root);
-    state.player.rigFixNode = findRigFixNode(root);
-    log('Prepared arena model');
-  }
+function prepareArenaModel(root, parentGroup) {
+  centerAndScaleModel(root, cfg.actorHeight || 95);
+  applyArenaModelBaseRotation(root);
+  tintModel(root, player.bodyColor, player.wandColor);
+  root.visible = true;
+  parentGroup.add(root);
+  state.player.rigFixNode = findRigFixNode(root);
+  log('Prepared arena model');
+}
 
-  function prepareDummyModel(root, parentGroup) {
-    centerAndScaleModel(root, cfg.actorHeight || 95);
-    applyArenaModelBaseRotation(root);
-    tintModel(root, '#ffd8b8', '#ff7a1a');
-    root.visible = true;
-    parentGroup.add(root);
-    state.dummy.rigFixNode = findRigFixNode(root);
-    log('Prepared dummy model');
-  }
+function prepareDummyModel(root, parentGroup) {
+  centerAndScaleModel(root, cfg.actorHeight || 95);
+  applyArenaModelBaseRotation(root);
+  tintModel(root, '#ffd8b8', '#ff7a1a');
+  root.visible = true;
+  parentGroup.add(root);
+  state.dummy.rigFixNode = findRigFixNode(root);
+  log('Prepared dummy model');
+}
 
   function preparePreviewModel(root, parentGroup) {
     const previewSettings = getPreviewSettings();
