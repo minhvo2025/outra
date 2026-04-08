@@ -71,7 +71,7 @@
     },
   };
 
-const ARENA_MODEL_BASE_EULER = new THREE.Euler(Math.PI / 2, 0, 0, 'XYZ');
+const ARENA_MODEL_BASE_EULER = new THREE.Euler(-Math.PI / 2, 0, 0, 'XYZ');
 
   function log(...args) {
     console.log('[Outra3D]', ...args);
