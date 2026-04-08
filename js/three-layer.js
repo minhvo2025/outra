@@ -54,7 +54,8 @@ player: {
   lastHp: null,
   shadow: null,
   rootGroup: null,
-  rotatePivot: null,
+  yawGroup: null,
+  modelMount: null,
   rigFixNode: null,
 },
 dummy: {
@@ -68,7 +69,8 @@ dummy: {
   lastHp: null,
   shadow: null,
   rootGroup: null,
-  rotatePivot: null,
+  yawGroup: null,
+  modelMount: null,
   rigFixNode: null,
 },
   };
@@ -407,32 +409,6 @@ function centerAndScaleModel(root, targetHeightOverride, options = {}) {
   });
 }
 
-function recenterModelAfterRotation(root) {
-  if (!root) return;
-
-  let box = computeBox(root);
-  let center = new THREE.Vector3();
-  let size = new THREE.Vector3();
-
-  box.getCenter(center);
-  box.getSize(size);
-
-  // Re-center on X/Z after rotation
-  root.position.x -= center.x;
-  root.position.z -= center.z;
-
-  // Re-ground on Y
-  box = computeBox(root);
-  box.getCenter(center);
-  box.getSize(size);
-
-  const minY = box.min.y;
-  root.position.y -= minY;
-  root.position.y += (cfg.hoverHeight || 0);
-
-  root.updateMatrixWorld(true);
-}
-
   function findRigFixNode(root) {
     if (!root) return null;
 
@@ -468,43 +444,41 @@ function recenterModelAfterRotation(root) {
     return namedRig || root;
   }
 
-function applyArenaModelBaseRotation(root) {
-  if (!root) return;
+function applyArenaModelBaseRotation(mount) {
+  if (!mount) return;
 
-  root.rotation.set(
+  mount.rotation.set(
     ARENA_MODEL_BASE_EULER.x,
     ARENA_MODEL_BASE_EULER.y,
     ARENA_MODEL_BASE_EULER.z
   );
 
-  root.updateMatrixWorld(true);
-  recenterModelAfterRotation(root);
+  mount.position.set(0, 0, 0);
+  mount.updateMatrixWorld(true);
 }
 
-function prepareArenaModel(root, parentGroup) {
+function prepareArenaModel(root, mountGroup) {
   centerAndScaleModel(root, cfg.actorHeight || 95, {
     autoRotateZUpToYUp: false
   });
 
-  applyArenaModelBaseRotation(root);
   tintModel(root, player.bodyColor, player.wandColor);
   root.visible = true;
-  parentGroup.add(root);
+  mountGroup.add(root);
 
   state.player.rigFixNode = null;
 
   log('Prepared arena model');
 }
 
-function prepareDummyModel(root, parentGroup) {
+function prepareDummyModel(root, mountGroup) {
   centerAndScaleModel(root, cfg.actorHeight || 95, {
     autoRotateZUpToYUp: false
   });
 
-  applyArenaModelBaseRotation(root);
   tintModel(root, '#ffd8b8', '#ff7a1a');
   root.visible = true;
-  parentGroup.add(root);
+  mountGroup.add(root);
 
   state.dummy.rigFixNode = null;
 
@@ -713,14 +687,22 @@ function preparePreviewModel(root, parentGroup) {
     state.scene.add(state.floor.rootGroup);
 
 state.player.rootGroup = new THREE.Group();
-state.player.rotatePivot = new THREE.Group();
-state.player.rootGroup.add(state.player.rotatePivot);
+state.player.yawGroup = new THREE.Group();
+state.player.modelMount = new THREE.Group();
+state.player.rootGroup.add(state.player.yawGroup);
+state.player.yawGroup.add(state.player.modelMount);
 state.scene.add(state.player.rootGroup);
 
+applyArenaModelBaseRotation(state.player.modelMount);
+
 state.dummy.rootGroup = new THREE.Group();
-state.dummy.rotatePivot = new THREE.Group();
-state.dummy.rootGroup.add(state.dummy.rotatePivot);
+state.dummy.yawGroup = new THREE.Group();
+state.dummy.modelMount = new THREE.Group();
+state.dummy.rootGroup.add(state.dummy.yawGroup);
+state.dummy.yawGroup.add(state.dummy.modelMount);
 state.scene.add(state.dummy.rootGroup);
+
+applyArenaModelBaseRotation(state.dummy.modelMount);
 
     const shadowGeo = new THREE.CircleGeometry(cfg.shadowSize || 24, 32);
     const shadowMat = new THREE.MeshBasicMaterial({
@@ -1092,7 +1074,7 @@ state.scene.add(state.dummy.rootGroup);
             'arena'
           );
 
-prepareArenaModel(state.player.root, state.player.rotatePivot);
+prepareArenaModel(state.player.root, state.player.modelMount);
           playStateAction(state.player.states, 'idle', true);
 
           arenaPlayerReady = true;
@@ -1118,7 +1100,7 @@ prepareArenaModel(state.player.root, state.player.rotatePivot);
             'arena'
           );
 
-prepareDummyModel(state.dummy.root, state.dummy.rotatePivot);
+prepareDummyModel(state.dummy.root, state.dummy.modelMount);
           playStateAction(state.dummy.states, 'idle', true);
 
           arenaDummyReady = true;
@@ -1359,9 +1341,9 @@ prepareDummyModel(state.dummy.root, state.dummy.rotatePivot);
       pos.z + mobileDynamicOffsetZ
     );
 
-    const aimAngle = Math.atan2(p.aimY, p.aimX);
-if (state.player.rotatePivot) {
-  state.player.rotatePivot.rotation.y = -aimAngle + Math.PI / 2;
+const aimAngle = Math.atan2(p.aimY, p.aimX);
+if (state.player.yawGroup) {
+  state.player.yawGroup.rotation.set(0, -aimAngle + Math.PI / 2, 0);
 }
 
     setArenaPlayerState(stateName);
@@ -1404,9 +1386,9 @@ if (state.player.rotatePivot) {
       pos.z + mobileDynamicOffsetZ
     );
 
-    const aimAngle = Math.atan2(player.y - dummy.y, player.x - dummy.x);
-if (state.dummy.rotatePivot) {
-  state.dummy.rotatePivot.rotation.y = -aimAngle + Math.PI / 2;
+const aimAngle = Math.atan2(player.y - dummy.y, player.x - dummy.x);
+if (state.dummy.yawGroup) {
+  state.dummy.yawGroup.rotation.set(0, -aimAngle + Math.PI / 2, 0);
 }
 
     setDummyState(stateName);
