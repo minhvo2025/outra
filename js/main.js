@@ -16,7 +16,7 @@ if (window.outraThree && window.outraThree.init) window.outraThree.init();
 loadProfile();
 applyPlayerColors();
 resizeCanvas();
-buildColorChoices();
+buildRankedPanel();
 buildKeybindsUI();
 renderStore();
 renderInventory();
