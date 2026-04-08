@@ -1412,29 +1412,32 @@
 
     update(dt) {
       updateArenaFloorPose();
-      if (!state.ready) return;
-      updateArenaPlayerPose(dt);
-      updateDummyPose(dt);
-      updatePreviewPose();
-      updateMixers(dt);
-    },
 
-    render() {
+      if (state.ready) {
+        updateArenaPlayerPose(dt);
+        updateDummyPose(dt);
+        updatePreviewPose();
+        updateMixers(dt);
+      } else {
+        updatePreviewPose();
+      }
+
+      // IMPORTANT:
+      // render preview while in lobby, render arena scene while in game
       if (gameState === 'lobby') {
-        if (
-          state.preview.renderer &&
-          state.preview.scene &&
-          state.preview.camera
-        ) {
+        if (state.preview.renderer && state.preview.scene && state.preview.camera) {
           state.preview.renderer.render(state.preview.scene, state.preview.camera);
         }
-        return;
+      } else {
+        if (state.renderer && state.scene && state.camera) {
+          state.renderer.render(state.scene, state.camera);
+          renderAnimationDebugLabel();
+        }
       }
+    },
 
-      if (state.renderer && state.scene && state.camera) {
-        state.renderer.render(state.scene, state.camera);
-        renderAnimationDebugLabel();
-      }
+ render() {
+      // Rendering is handled inside update()
     },
 
     renderLobbyPreview() {
@@ -1443,11 +1446,11 @@
     },
 
     isPlayerRenderedIn3D() {
-      return !!state.ready;
+      return !!(state.ready && state.player.root && state.player.rootGroup && gameState !== 'lobby');
     },
 
-    isDummyRenderedIn3D() {
-      return !!state.ready && !!dummyEnabled && !!state.dummy.root;
+      isDummyRenderedIn3D() {
+      return !!(state.ready && dummyEnabled && state.dummy.root && state.dummy.rootGroup && gameState !== 'lobby');
     },
 
     isArenaFloorRenderedIn3D() {
