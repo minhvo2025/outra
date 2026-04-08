@@ -1,6 +1,11 @@
 // ── Persistence ───────────────────────────────────────────────
 function saveProfile() {
-  localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: player.name, selectedColorIndex, keybinds, profile }));
+  localStorage.setItem(PROFILE_KEY, JSON.stringify({
+    name: player.name,
+    selectedColorIndex,
+    keybinds,
+    profile
+  }));
 }
 
 function loadProfile() {
@@ -19,7 +24,7 @@ function loadProfile() {
 
     if (data.name) player.name = String(data.name).slice(0, 16);
 
-    if (Number.isInteger(data.selectedColorIndex) && colorChoices[data.selectedColorIndex]) {
+    if (Number.isInteger(data.selectedColorIndex)) {
       selectedColorIndex = data.selectedColorIndex;
     }
 
@@ -35,6 +40,13 @@ function loadProfile() {
         profile.aimSensitivity = data.profile.aimSensitivity;
       }
 
+      if (data.profile.ranked && typeof data.profile.ranked === 'object') {
+        profile.ranked.mmr = Math.max(0, Number(data.profile.ranked.mmr) || 0);
+        profile.ranked.wins = Math.max(0, Number(data.profile.ranked.wins) || 0);
+        profile.ranked.losses = Math.max(0, Number(data.profile.ranked.losses) || 0);
+        profile.ranked.zeroStarLossBuffer = Math.max(0, Number(data.profile.ranked.zeroStarLossBuffer) || 0);
+      }
+
       profile.store = { ...profile.store, ...(data.profile.store || {}) };
       profile.equipped = { ...profile.equipped, ...(data.profile.equipped || {}) };
     }
@@ -43,8 +55,12 @@ function loadProfile() {
       saveProfile();
     }
   } catch {}
+
   musicMuted = profile.musicMuted;
   if (typeof profile.aimSensitivity !== 'number') profile.aimSensitivity = 0.7;
+  if (!profile.ranked) {
+    profile.ranked = { mmr: 0, wins: 0, losses: 0, zeroStarLossBuffer: 0 };
+  }
 }
 
 // ── Leaderboard ───────────────────────────────────────────────
@@ -103,7 +119,123 @@ function getPlayerPoints(name) {
   return entry ? entry.points : 0;
 }
 
-// ── Math Helpers ──────────────────────────────────────────────
+// ── Ranked Helpers ────────────────────────────────────────────
+function getRankTierByMmr(mmr) {
+  const safeMmr = Math.max(0, Number(mmr) || 0);
+  return RANKED_CONFIG.tiers.find(t => safeMmr >= t.min && safeMmr <= t.max) || RANKED_CONFIG.tiers[0];
+}
+
+function getRankTierIndexByMmr(mmr) {
+  const tier = getRankTierByMmr(mmr);
+  return Math.max(0, RANKED_CONFIG.tiers.findIndex(t => t.key === tier.key));
+}
+
+function getStarsFromMmr(mmr) {
+  const tier = getRankTierByMmr(mmr);
+  if (tier.max === Infinity) return RANKED_CONFIG.promoStarCount;
+
+  const span = Math.max(1, (tier.max - tier.min + 1));
+  const offset = Math.max(0, Math.min(span - 1, mmr - tier.min));
+  const stars = Math.min(
+    RANKED_CONFIG.promoStarCount,
+    Math.floor(offset / RANKED_CONFIG.mmrPerStar)
+  );
+
+  return stars;
+}
+
+function isPromoMatchByMmr(mmr) {
+  const tier = getRankTierByMmr(mmr);
+  if (tier.max === Infinity) return false;
+
+  const offset = Math.max(0, mmr - tier.min);
+  return offset >= (RANKED_CONFIG.promoStarCount * RANKED_CONFIG.mmrPerStar);
+}
+
+function getRankedSnapshot() {
+  const mmr = Math.max(0, Number(profile.ranked?.mmr) || 0);
+  const tier = getRankTierByMmr(mmr);
+  const stars = getStarsFromMmr(mmr);
+  const promo = isPromoMatchByMmr(mmr);
+
+  return {
+    mmr,
+    tier,
+    tierIndex: getRankTierIndexByMmr(mmr),
+    stars,
+    promo,
+    wins: Number(profile.ranked?.wins) || 0,
+    losses: Number(profile.ranked?.losses) || 0,
+    zeroStarLossBuffer: Number(profile.ranked?.zeroStarLossBuffer) || 0,
+  };
+}
+
+function getRankedResultSummary(didWin, before, after, forcedDerank) {
+  const parts = [];
+
+  parts.push(`${didWin ? '+' : '-'}${didWin ? RANKED_CONFIG.winMmr : RANKED_CONFIG.lossMmr} MMR`);
+
+  if (after.tier.key !== before.tier.key) {
+    if (after.tierIndex > before.tierIndex) {
+      parts.push(`PROMOTED TO ${after.tier.name.toUpperCase()}`);
+    } else if (forcedDerank || after.tierIndex < before.tierIndex) {
+      parts.push(`DERANKED TO ${after.tier.name.toUpperCase()}`);
+    }
+  } else if (after.promo && !before.promo) {
+    parts.push('RANK UP MATCH');
+  }
+
+  return parts.join(' • ');
+}
+
+function applyRankedMatchResult(didWin) {
+  if (!profile.ranked) {
+    profile.ranked = { mmr: 0, wins: 0, losses: 0, zeroStarLossBuffer: 0 };
+  }
+
+  const before = getRankedSnapshot();
+
+  if (didWin) {
+    profile.ranked.wins += 1;
+    profile.ranked.mmr += RANKED_CONFIG.winMmr;
+    profile.ranked.zeroStarLossBuffer = 0;
+  } else {
+    profile.ranked.losses += 1;
+
+    const atZeroStars = before.stars <= 0;
+    if (atZeroStars) {
+      profile.ranked.zeroStarLossBuffer += 1;
+    } else {
+      profile.ranked.zeroStarLossBuffer = 0;
+    }
+
+    profile.ranked.mmr = Math.max(0, profile.ranked.mmr - RANKED_CONFIG.lossMmr);
+  }
+
+  let forcedDerank = false;
+  const afterLossRaw = getRankedSnapshot();
+
+  if (!didWin) {
+    const sameTier = afterLossRaw.tier.key === before.tier.key;
+    const stillAtZero = afterLossRaw.stars <= 0;
+
+    if (
+      sameTier &&
+      stillAtZero &&
+      profile.ranked.zeroStarLossBuffer > RANKED_CONFIG.derankProtectionLossesAtZero &&
+      before.tierIndex > 0
+    ) {
+      const prevTier = RANKED_CONFIG.tiers[before.tierIndex - 1];
+      profile.ranked.mmr = prevTier.min + (RANKED_CONFIG.promoStarCount - 1) * RANKED_CONFIG.mmrPerStar;
+      profile.ranked.zeroStarLossBuffer = 0;
+      forcedDerank = true;
+    }
+  }
+
+  const after = getRankedSnapshot();
+  saveProfile();
+  return getRankedResultSummary(didWin, before, after, forcedDerank);
+}
 
 // ── Math Helpers ──────────────────────────────────────────────
 function distance(ax, ay, bx, by) { return Math.hypot(bx - ax, by - ay); }
@@ -271,7 +403,6 @@ function spawnDamageText(x, y, amount, color = '#ffd36b', prefix = '-') {
   damageTexts.push({ x, y: y - 12, value: `${prefix}${Math.round(amount)}`, life: 0.75, vy: -34, color });
 }
 
-
 function clearRewindHistory() {
   rewindHistory.length = 0;
   rewindLastSampleAt = 0;
@@ -356,10 +487,23 @@ function getWallPlacementData() {
   return { dir, perp, centerX, centerY, duration, segments };
 }
 
-
 // ── Player Colors ─────────────────────────────────────────────
+function getAutoColorIndexFromName(name) {
+  const source = String(name || 'Player').trim().toLowerCase() || 'player';
+  let hash = 0;
+  for (let i = 0; i < source.length; i++) {
+    hash = ((hash << 5) - hash) + source.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) % autoPlayerColors.length;
+}
+
+function getAutoColorForPlayerName(name) {
+  return autoPlayerColors[getAutoColorIndexFromName(name)] || autoPlayerColors[0];
+}
+
 function applyPlayerColors() {
-  const choice = colorChoices[selectedColorIndex] || colorChoices[0];
+  const choice = getAutoColorForPlayerName(player.name);
   player.bodyColor = choice.body;
   player.wandColor = choice.wand;
 }
@@ -476,10 +620,10 @@ function shootFireFromDummy() {
   const dir = normalized(player.x - dummy.x, player.y - dummy.y);
   dummy.fireReadyAt = now + dummy.fireCooldown;
   soundFire();
-    if (window.outraThree && window.outraThree.triggerDummyCast) {
+  if (window.outraThree && window.outraThree.triggerDummyCast) {
     window.outraThree.triggerDummyCast();
   }
-  
+
   projectiles.push({
     owner: 'dummy',
     x: dummy.x + dir.x * (dummy.r + 10),
@@ -512,11 +656,11 @@ function castHookFromDummy() {
   if (dist > 260 || hasObstacleBetween(dummy.x, dummy.y, player.x, player.y, 0)) return;
   dummy.hookReadyAt = now + dummy.hookCooldown;
   soundHook();
-  
-    if (window.outraThree && window.outraThree.triggerDummyCast) {
+
+  if (window.outraThree && window.outraThree.triggerDummyCast) {
     window.outraThree.triggerDummyCast();
   }
-  
+
   hooks.push({
     owner: 'dummy', state: 'flying',
     x: dummy.x, y: dummy.y, sx: dummy.x, sy: dummy.y,
@@ -552,7 +696,7 @@ function castArcaneCharge() {
   player.chargeActive = true;
   player.chargeDirX = dir.x;
   player.chargeDirY = dir.y;
-player.chargeTimer = player.teleportDistance / 760;
+  player.chargeTimer = player.teleportDistance / 760;
   player.chargeHit = false;
   player.vx = dir.x * 760;
   player.vy = dir.y * 760;
@@ -570,25 +714,19 @@ function castShockBlast() {
   ) return;
 
   const dir = getPlayerAim();
-
-  // cooldown
   player.shockReadyAt = now + player.shockCooldown;
 
-  // animation
   if (window.outraThree && window.outraThree.triggerCast) {
     window.outraThree.triggerCast();
   }
 
-  // sound
   soundShock();
 
-  // SETTINGS
   const range = 115;
-  const angle = Math.PI / 3; // 60° cone
+  const angle = Math.PI / 3;
   const damage = 14;
   const knockback = 680;
 
-  // HIT CHECK
   if (dummyEnabled && dummy.alive) {
     const dx = dummy.x - player.x;
     const dy = dummy.y - player.y;
@@ -596,35 +734,18 @@ function castShockBlast() {
 
     if (dist <= range) {
       const nd = normalized(dx, dy);
-
-      // angle check (cone)
       const dot = nd.x * dir.x + nd.y * dir.y;
 
       if (dot > Math.cos(angle / 2)) {
         damageDummy(damage);
-
         dummy.vx += nd.x * knockback;
         dummy.vy += nd.y * knockback;
-
-        spawnBurst(
-          dummy.x,
-          dummy.y,
-          'rgba(255,200,120,0.95)',
-          18,
-          200
-        );
+        spawnBurst(dummy.x, dummy.y, 'rgba(255,200,120,0.95)', 18, 200);
       }
     }
   }
 
-  // player effect
-  spawnBurst(
-    player.x,
-    player.y,
-    'rgba(255,180,120,0.7)',
-    12,
-    120
-  );
+  spawnBurst(player.x, player.y, 'rgba(255,180,120,0.7)', 12, 120);
 }
 
 function castGust() {
@@ -648,13 +769,7 @@ function castGust() {
   const damage = 4;
   const knockback = 540;
 
-  spawnBurst(
-    player.x,
-    player.y,
-    'rgba(170,245,255,0.92)',
-    18,
-    radius * 1.7
-  );
+  spawnBurst(player.x, player.y, 'rgba(170,245,255,0.92)', 18, radius * 1.7);
 
   for (let i = 0; i < 18; i++) {
     const ang = (Math.PI * 2 * i) / 18 + Math.random() * 0.18;
@@ -850,8 +965,9 @@ function tryTeleport() {
 
 // ── AI ────────────────────────────────────────────────────────
 function moveDummyAI(dt) {
-if (!dummyEnabled || !dummy.alive || !player.alive || gameState !== 'playing') return;
-if (dummyBehavior !== 'active') return;
+  if (!dummyEnabled || !dummy.alive || !player.alive || gameState !== 'playing') return;
+  if (dummyBehavior !== 'active') return;
+
   dummy.aiSwitchTimer -= dt;
   dummy.aiMoveTimer   -= dt;
   const distToPlayer = distance(dummy.x, dummy.y, player.x, player.y);
@@ -979,29 +1095,40 @@ function killDummy(reason) {
 function endMatch(playerWon) {
   if (gameState !== 'playing') return;
   gameState = 'result';
+
+  let rankedText = '';
+
+  if (dummyEnabled && dummyBehavior === 'active') {
+    rankedText = applyRankedMatchResult(playerWon);
+  }
+
   if (playerWon) {
     awardWinRewards(player.name);
     soundWin();
-    winnerText = `${player.name} wins! +3 pts +1 WLK`;
+    winnerText = `${player.name} wins! +3 pts +1 WLK${rankedText ? ` • ${rankedText}` : ''}`;
   } else {
     soundLose();
-    winnerText = dummyEnabled ? 'Dummy wins!' : 'Round ended';
+    winnerText = dummyEnabled
+      ? `Dummy wins!${rankedText ? ` • ${rankedText}` : ''}`
+      : 'Round ended';
   }
+
   resultTimer = 2.2;
   updateHud();
 }
+
 function spawnDummy(mode = 'active') {
   dummyEnabled = true;
   dummyBehavior = mode;
 
   const d = findValidSpawnNear(dummySpawn.x, dummySpawn.y, 0);
 
-Object.assign(dummy, {
-  x: d.x, y: d.y, vx: 0, vy: 0,
-  hp: dummy.maxHp, alive: dummyEnabled, deadReason: dummyEnabled ? '' : 'removed',
-  fireReadyAt: 0, hookReadyAt: 0,
-  aiSwitchTimer: 0, aiMoveTimer: 0, targetX: d.x, targetY: d.y
-});
+  Object.assign(dummy, {
+    x: d.x, y: d.y, vx: 0, vy: 0,
+    hp: dummy.maxHp, alive: dummyEnabled, deadReason: dummyEnabled ? '' : 'removed',
+    fireReadyAt: 0, hookReadyAt: 0,
+    aiSwitchTimer: 0, aiMoveTimer: 0, targetX: d.x, targetY: d.y
+  });
 }
 
 function removeDummy() {
@@ -1009,6 +1136,7 @@ function removeDummy() {
   dummy.alive = false;
   dummy.deadReason = 'removed';
 }
+
 function resetRound() {
   updateArenaGeometry(true);
   arena.shrinkTimer    = arena.shrinkInterval;
@@ -1069,7 +1197,7 @@ function enterLobby() {
   renderStore();
   renderInventory();
   nameInput.value = player.name;
-  buildColorChoices();
+  buildRankedPanel();
   buildKeybindsUI();
   drawLobbyPreview();
   setLobbyTab(activeLobbyTab);
@@ -1140,7 +1268,6 @@ function update(dt) {
     updateActorPhysics(dummy, dt);
   }
 
-  // Dummy lava damage
   const dummyDist = distance(dummy.x, dummy.y, arena.cx, arena.cy);
   if (dummyEnabled && dummy.alive && dummyDist > arena.radius) {
     damageDummy(10 * dt * 4);
@@ -1149,7 +1276,6 @@ function update(dt) {
   }
   if (dummyEnabled && dummy.alive && dummyDist > arena.radius + 120) killDummy('fell fully into lava');
 
-  // Player lava damage
   const playerDist = distance(player.x, player.y, arena.cx, arena.cy);
   if (player.alive && playerDist > arena.radius) {
     lavaTick -= dt;
@@ -1159,7 +1285,6 @@ function update(dt) {
   }
   if (player.alive && playerDist > arena.radius + 120) killPlayer('fell fully into lava');
 
-  // Projectiles
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
     p.x += p.vx * dt;
@@ -1195,7 +1320,6 @@ function update(dt) {
     if (p.life <= 0 || distance(p.x, p.y, arena.cx, arena.cy) > arena.radius + 180) projectiles.splice(i, 1);
   }
 
-  // Hooks
   for (let i = hooks.length - 1; i >= 0; i--) {
     const h            = hooks[i];
     const targetActor  = h.owner === 'player' ? dummy : player;
@@ -1239,7 +1363,6 @@ function update(dt) {
     }
   }
 
-  // Walls
   for (let i = walls.length - 1; i >= 0; i--) {
     const wall = walls[i];
     wall.life -= dt;
@@ -1251,14 +1374,12 @@ function update(dt) {
     }
   }
 
-  // Particles
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
     if (p.life <= 0) particles.splice(i, 1);
   }
 
-  // Damage texts
   for (let i = damageTexts.length - 1; i >= 0; i--) {
     const d = damageTexts[i];
     d.y += d.vy * dt; d.life -= dt;
