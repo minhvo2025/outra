@@ -92,20 +92,35 @@
     return null;
   }
 
-  function getCharacterConfig() {
-    const charCfg = cfg.playerCharacter || {};
-    return {
-      glb: charCfg.glb || charCfg.path || '',
-      animations: {
-        idle: charCfg.animations?.idle || 'Idle_4',
-        walk: charCfg.animations?.walk || 'Walking',
-        run: charCfg.animations?.run || 'Running',
-        cast: charCfg.animations?.cast || 'mage_soell_cast_4',
-        dash: charCfg.animations?.dash || 'Shield_Push_Left',
-        hit: charCfg.animations?.hit || 'Hit_Reaction_1',
-      },
-    };
-  }
+function getArenaCharacterConfig() {
+  const charCfg = cfg.arenaCharacter || {};
+  return {
+    glb: charCfg.glb || '',
+    animations: {
+      idle: charCfg.animations?.idle || 'idle',
+      walk: charCfg.animations?.walk || 'run',
+      run: charCfg.animations?.run || 'run',
+      cast: charCfg.animations?.cast || 'cast',
+      dash: charCfg.animations?.dash || 'dash',
+      hit: charCfg.animations?.hit || 'hit',
+    },
+  };
+}
+
+function getLobbyCharacterConfig() {
+  const charCfg = cfg.lobbyCharacter || {};
+  return {
+    glb: charCfg.glb || '',
+    animations: {
+      idle: charCfg.animations?.idle || 'idle',
+      walk: null,
+      run: null,
+      cast: null,
+      dash: null,
+      hit: null,
+    },
+  };
+}
 
   function getArenaFloorConfig() {
     const floorCfg = cfg.arenaFloor || {};
@@ -825,20 +840,20 @@ function tintModel(root, bodyColorHex, wandColorHex) {
     state.preview.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     state.preview.renderer.toneMappingExposure = 1.0;
 
-    const ambient = new THREE.AmbientLight(0xffffff, 1.45);
-    state.preview.scene.add(ambient);
+const ambient = new THREE.AmbientLight(0xffffff, 1.35);
+state.preview.scene.add(ambient);
 
-    const key = new THREE.DirectionalLight(0xffffff, 1.15);
-    key.position.set(120, 160, 160);
-    state.preview.scene.add(key);
+const key = new THREE.DirectionalLight(0xfff0dd, 1.25);
+key.position.set(120, 170, 150);
+state.preview.scene.add(key);
 
-    const fill = new THREE.DirectionalLight(0xb8ccff, 0.55);
-    fill.position.set(-110, 80, 120);
-    state.preview.scene.add(fill);
+const fill = new THREE.DirectionalLight(0xa785ff, 0.42);
+fill.position.set(-120, 90, 130);
+state.preview.scene.add(fill);
 
-    const rim = new THREE.DirectionalLight(0xffffff, 0.35);
-    rim.position.set(-90, 120, -150);
-    state.preview.scene.add(rim);
+const rim = new THREE.DirectionalLight(0xffb15b, 0.38);
+rim.position.set(0, 110, -170);
+state.preview.scene.add(rim);
 
     state.preview.rootGroup = new THREE.Group();
     state.preview.scene.add(state.preview.rootGroup);
@@ -947,54 +962,57 @@ function tintModel(root, bodyColorHex, wandColorHex) {
     }
   }
 
-  function buildAnimationStateMap(animations, mixer) {
-    const charCfg = getCharacterConfig();
-    const result = new Map();
+function buildAnimationStateMap(animations, mixer, mode = 'arena') {
+  const charCfg = mode === 'preview'
+    ? getLobbyCharacterConfig()
+    : getArenaCharacterConfig();
 
-    const wantedStates = {
-      idle: charCfg.animations.idle,
-      walk: charCfg.animations.walk,
-      run: charCfg.animations.run,
-      cast: charCfg.animations.cast,
-      dash: charCfg.animations.dash,
-      hit: charCfg.animations.hit,
-    };
+  const result = new Map();
 
-    Object.entries(wantedStates).forEach(([stateName, clipName]) => {
-      if (!clipName || !mixer) return;
-      const clip = THREE.AnimationClip.findByName(animations, clipName);
-      if (!clip) {
-        console.warn(`[Outra3D] Missing animation clip "${clipName}" for state "${stateName}"`);
-        return;
-      }
+  const wantedStates = {
+    idle: charCfg.animations.idle,
+    walk: charCfg.animations.walk,
+    run: charCfg.animations.run,
+    cast: charCfg.animations.cast,
+    dash: charCfg.animations.dash,
+    hit: charCfg.animations.hit,
+  };
 
-      const action = mixer.clipAction(clip);
-      action.enabled = true;
-      action.clampWhenFinished = false;
-      action.setLoop(THREE.LoopRepeat, Infinity);
-
-      result.set(stateName, {
-        clipName,
-        clip,
-        action,
-      });
-    });
-
-    if (!result.size && animations.length && mixer) {
-      const fallback = animations[0];
-      const action = mixer.clipAction(fallback);
-      action.enabled = true;
-      action.clampWhenFinished = false;
-      action.setLoop(THREE.LoopRepeat, Infinity);
-      result.set('idle', {
-        clipName: fallback.name,
-        clip: fallback,
-        action,
-      });
+  Object.entries(wantedStates).forEach(([stateName, clipName]) => {
+    if (!clipName || !mixer) return;
+    const clip = THREE.AnimationClip.findByName(animations, clipName);
+    if (!clip) {
+      console.warn(`[Outra3D] Missing animation clip "${clipName}" for state "${stateName}" (${mode})`);
+      return;
     }
 
-    return result;
+    const action = mixer.clipAction(clip);
+    action.enabled = true;
+    action.clampWhenFinished = false;
+    action.setLoop(THREE.LoopRepeat, Infinity);
+
+    result.set(stateName, {
+      clipName,
+      clip,
+      action,
+    });
+  });
+
+  if (!result.size && animations.length && mixer) {
+    const fallback = animations[0];
+    const action = mixer.clipAction(fallback);
+    action.enabled = true;
+    action.clampWhenFinished = false;
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    result.set('idle', {
+      clipName: fallback.name,
+      clip: fallback,
+      action,
+    });
   }
+
+  return result;
+}
 
   function loadArenaFloor() {
     const floorCfg = getArenaFloorConfig();
@@ -1022,151 +1040,164 @@ function tintModel(root, bodyColorHex, wandColorHex) {
     );
   }
 
-  function loadCharacterStates() {
-    const charCfg = getCharacterConfig();
-    const glbUrl = charCfg.glb;
+function loadCharacterStates() {
+  const arenaCfg = getArenaCharacterConfig();
+  const lobbyCfg = getLobbyCharacterConfig();
 
-    if (!glbUrl) {
+  const arenaGlbUrl = arenaCfg.glb;
+  const lobbyGlbUrl = lobbyCfg.glb;
+
+  if (!arenaGlbUrl) {
+    state.failed = true;
+    console.error('[Outra3D] No arena GLB path configured.');
+    return;
+  }
+
+  if (!lobbyGlbUrl) {
+    state.failed = true;
+    console.error('[Outra3D] No lobby GLB path configured.');
+    return;
+  }
+
+  let arenaLoaded = false;
+  let previewLoaded = false;
+  let dummyLoaded = false;
+
+  function finalizeIfReady() {
+    if (!arenaLoaded || !previewLoaded || !dummyLoaded) return;
+
+    if (!state.player.root || !state.player.states.size) {
       state.failed = true;
-      console.error('[Outra3D] No GLB path configured.');
+      console.error('[Outra3D] Arena model failed to load correctly.');
       return;
     }
 
-    let arenaLoaded = false;
-    let previewLoaded = false;
-    let dummyLoaded = false;
+    if (state.dummy.states.size) {
+      const firstDummy = state.dummy.states.has('idle')
+        ? 'idle'
+        : Array.from(state.dummy.states.keys())[0];
+      setDummyState(firstDummy, true);
+    }
 
-        state.loader.load(
-      glbUrl,
-      (gltf) => {
-        try {
-          const dummyRoot = gltf.scene;
-          prepareDummyModel(dummyRoot, state.dummy.rootGroup);
+    state.ready = true;
+    state.preview.ready = !!state.preview.root && !!state.preview.states.size;
+    state.player.lastHp = typeof player !== 'undefined' ? player.hp : 100;
 
-          state.dummy.root = dummyRoot;
-          state.dummy.mixer = gltf.animations && gltf.animations.length
-            ? new THREE.AnimationMixer(dummyRoot)
-            : null;
-          state.dummy.states = buildAnimationStateMap(
-            gltf.animations || [],
-            state.dummy.mixer
-          );
+    if (state.debugBox) state.debugBox.visible = false;
 
-          dummyLoaded = true;
-          finalizeIfReady();
-        } catch (e) {
-          console.error('[Outra3D] Error preparing dummy model', e);
-          dummyLoaded = true;
-          finalizeIfReady();
-        }
-      },
-      undefined,
-      (error) => {
-        console.error('[Outra3D] Failed to load dummy GLB', glbUrl, error);
+    const firstArena = state.player.states.has('idle')
+      ? 'idle'
+      : Array.from(state.player.states.keys())[0];
+
+    setArenaPlayerState(firstArena, true);
+
+    if (state.preview.ready) {
+      const firstPreview = state.preview.states.has('idle')
+        ? 'idle'
+        : Array.from(state.preview.states.keys())[0];
+      setPreviewState(firstPreview, true);
+    }
+
+    log('3D player ready');
+  }
+
+  state.loader.load(
+    arenaGlbUrl,
+    (gltf) => {
+      try {
+        const dummyRoot = gltf.scene;
+        prepareDummyModel(dummyRoot, state.dummy.rootGroup);
+
+        state.dummy.root = dummyRoot;
+        state.dummy.mixer = gltf.animations && gltf.animations.length
+          ? new THREE.AnimationMixer(dummyRoot)
+          : null;
+        state.dummy.states = buildAnimationStateMap(
+          gltf.animations || [],
+          state.dummy.mixer,
+          'arena'
+        );
+
+        dummyLoaded = true;
+        finalizeIfReady();
+      } catch (e) {
+        console.error('[Outra3D] Error preparing dummy model', e);
         dummyLoaded = true;
         finalizeIfReady();
       }
-    );
-
-      function finalizeIfReady() {
-      if (!arenaLoaded || !previewLoaded || !dummyLoaded) return;
-
-      if (!state.player.root || !state.player.states.size) {
-        state.failed = true;
-        console.error('[Outra3D] Arena model failed to load correctly.');
-        return;
-      }
-              if (state.dummy.states.size) {
-        const firstDummy = state.dummy.states.has('idle')
-          ? 'idle'
-          : Array.from(state.dummy.states.keys())[0];
-        setDummyState(firstDummy, true);
-      }
-
-      state.ready = true;
-      state.preview.ready = !!state.preview.root && !!state.preview.states.size;
-      state.player.lastHp = typeof player !== 'undefined' ? player.hp : 100;
-
-      if (state.debugBox) state.debugBox.visible = false;
-
-      const firstArena = state.player.states.has('idle')
-        ? 'idle'
-        : Array.from(state.player.states.keys())[0];
-
-      setArenaPlayerState(firstArena, true);
-
-      if (state.preview.ready) {
-        const firstPreview = state.preview.states.has('idle')
-          ? 'idle'
-          : Array.from(state.preview.states.keys())[0];
-        setPreviewState(firstPreview, true);
-      }
-
-      log('3D player ready');
+    },
+    undefined,
+    (error) => {
+      console.error('[Outra3D] Failed to load dummy GLB', arenaGlbUrl, error);
+      dummyLoaded = true;
+      finalizeIfReady();
     }
+  );
 
-    state.loader.load(
-      glbUrl,
-      (gltf) => {
-        try {
-          const arenaRoot = gltf.scene;
-          prepareArenaModel(arenaRoot, state.player.rootGroup);
+  state.loader.load(
+    arenaGlbUrl,
+    (gltf) => {
+      try {
+        const arenaRoot = gltf.scene;
+        prepareArenaModel(arenaRoot, state.player.rootGroup);
 
-          state.player.root = arenaRoot;
-          state.player.mixer = gltf.animations && gltf.animations.length
-            ? new THREE.AnimationMixer(arenaRoot)
-            : null;
-          state.player.states = buildAnimationStateMap(
-            gltf.animations || [],
-            state.player.mixer
-          );
+        state.player.root = arenaRoot;
+        state.player.mixer = gltf.animations && gltf.animations.length
+          ? new THREE.AnimationMixer(arenaRoot)
+          : null;
+        state.player.states = buildAnimationStateMap(
+          gltf.animations || [],
+          state.player.mixer,
+          'arena'
+        );
 
-          arenaLoaded = true;
-          finalizeIfReady();
-        } catch (e) {
-          console.error('[Outra3D] Error preparing arena model', e);
-          state.failed = true;
-        }
-      },
-      undefined,
-      (error) => {
-        console.error('[Outra3D] Failed to load arena GLB', glbUrl, error);
+        arenaLoaded = true;
+        finalizeIfReady();
+      } catch (e) {
+        console.error('[Outra3D] Error preparing arena model', e);
         state.failed = true;
       }
-    );
+    },
+    undefined,
+    (error) => {
+      console.error('[Outra3D] Failed to load arena GLB', arenaGlbUrl, error);
+      state.failed = true;
+    }
+  );
 
-    state.loader.load(
-      glbUrl,
-      (gltf) => {
-        try {
-          const previewRoot = gltf.scene;
-          preparePreviewModel(previewRoot, state.preview.rootGroup);
+  state.loader.load(
+    lobbyGlbUrl,
+    (gltf) => {
+      try {
+        const previewRoot = gltf.scene;
+        preparePreviewModel(previewRoot, state.preview.rootGroup);
 
-          state.preview.root = previewRoot;
-          state.preview.mixer = gltf.animations && gltf.animations.length
-            ? new THREE.AnimationMixer(previewRoot)
-            : null;
-          state.preview.states = buildAnimationStateMap(
-            gltf.animations || [],
-            state.preview.mixer
-          );
+        state.preview.root = previewRoot;
+        state.preview.mixer = gltf.animations && gltf.animations.length
+          ? new THREE.AnimationMixer(previewRoot)
+          : null;
+        state.preview.states = buildAnimationStateMap(
+          gltf.animations || [],
+          state.preview.mixer,
+          'preview'
+        );
 
-          previewLoaded = true;
-          finalizeIfReady();
-        } catch (e) {
-          console.error('[Outra3D] Error preparing preview model', e);
-          previewLoaded = true;
-          finalizeIfReady();
-        }
-      },
-      undefined,
-      (error) => {
-        console.error('[Outra3D] Failed to load preview GLB', glbUrl, error);
+        previewLoaded = true;
+        finalizeIfReady();
+      } catch (e) {
+        console.error('[Outra3D] Error preparing preview model', e);
         previewLoaded = true;
         finalizeIfReady();
       }
-    );
-  }
+    },
+    undefined,
+    (error) => {
+      console.error('[Outra3D] Failed to load preview GLB', lobbyGlbUrl, error);
+      previewLoaded = true;
+      finalizeIfReady();
+    }
+  );
+}
 
   function getWorldPositionFromCoords(x, y) {
     const worldScale = cfg.worldScale || 1;
@@ -1371,6 +1402,7 @@ console.log('[Outra3D] Applying tint key:', tintKey);
 
     state.preview.currentRotationY += (state.preview.targetRotationY - state.preview.currentRotationY) * 0.14;
     state.preview.rootGroup.rotation.y = state.preview.currentRotationY;
+    state.preview.rootGroup.position.y = previewSettings.modelYOffset;
 
     const previewSettings = getPreviewSettings();
     state.preview.rootGroup.position.set(0, previewSettings.modelYOffset, 0);
