@@ -405,6 +405,32 @@ function centerAndScaleModel(root, targetHeightOverride, options = {}) {
   });
 }
 
+function recenterModelAfterRotation(root) {
+  if (!root) return;
+
+  let box = computeBox(root);
+  let center = new THREE.Vector3();
+  let size = new THREE.Vector3();
+
+  box.getCenter(center);
+  box.getSize(size);
+
+  // Re-center on X/Z after rotation
+  root.position.x -= center.x;
+  root.position.z -= center.z;
+
+  // Re-ground on Y
+  box = computeBox(root);
+  box.getCenter(center);
+  box.getSize(size);
+
+  const minY = box.min.y;
+  root.position.y -= minY;
+  root.position.y += (cfg.hoverHeight || 0);
+
+  root.updateMatrixWorld(true);
+}
+
   function findRigFixNode(root) {
     if (!root) return null;
 
@@ -442,12 +468,15 @@ function centerAndScaleModel(root, targetHeightOverride, options = {}) {
 
 function applyArenaModelBaseRotation(root) {
   if (!root) return;
+
   root.rotation.set(
     ARENA_MODEL_BASE_EULER.x,
     ARENA_MODEL_BASE_EULER.y,
     ARENA_MODEL_BASE_EULER.z
   );
+
   root.updateMatrixWorld(true);
+  recenterModelAfterRotation(root);
 }
 
 function prepareArenaModel(root, parentGroup) {
@@ -460,7 +489,6 @@ function prepareArenaModel(root, parentGroup) {
   root.visible = true;
   parentGroup.add(root);
 
-  // Do not use rig fix for arena model
   state.player.rigFixNode = null;
 
   log('Prepared arena model');
@@ -476,7 +504,6 @@ function prepareDummyModel(root, parentGroup) {
   root.visible = true;
   parentGroup.add(root);
 
-  // Do not use rig fix for arena dummy
   state.dummy.rigFixNode = null;
 
   log('Prepared dummy model');
