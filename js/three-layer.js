@@ -75,7 +75,7 @@ dummy: {
 },
   };
 
-const ARENA_MODEL_BASE_EULER = new THREE.Euler(Math.PI, Math.PI, 0, 'XYZ');
+const ARENA_MODEL_BASE_EULER = new THREE.Euler(0, 0, 0, 'XYZ');
 
   function log(...args) {
     console.log('[Outra3D]', ...args);
@@ -1384,7 +1384,7 @@ prepareDummyModel(state.dummy.root, state.dummy.modelMount);
 
 const aimAngle = Math.atan2(p.aimY, p.aimX);
 if (state.player.yawGroup) {
-  state.player.yawGroup.rotation.set(0, -aimAngle + Math.PI / 2, 0);
+  state.player.yawGroup.rotation.set(0, -aimAngle - Math.PI / 2, 0);
 }
 
     setArenaPlayerState(stateName);
@@ -1429,7 +1429,7 @@ if (state.player.yawGroup) {
 
 const aimAngle = Math.atan2(player.y - dummy.y, player.x - dummy.x);
 if (state.dummy.yawGroup) {
-  state.dummy.yawGroup.rotation.set(0, -aimAngle + Math.PI / 2, 0);
+  state.dummy.yawGroup.rotation.set(0, -aimAngle - Math.PI / 2, 0);
 }
 
     setDummyState(stateName);
