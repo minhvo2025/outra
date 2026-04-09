@@ -264,8 +264,7 @@ function getRankBadgeHtml(snapshot) {
 function buildRankedPanel() {
   if (!colorRow) return;
 
-  const snapshot = getRankedSnapshot();
-  const autoColor = getAutoColorForPlayerName(player.name);
+const snapshot = getRankedSnapshot();
 
   colorRow.innerHTML = `
     <div style="
@@ -297,21 +296,9 @@ function buildRankedPanel() {
             </div>
           </div>
 
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-            <div style="font-size:12px; opacity:.78;">W ${snapshot.wins} • L ${snapshot.losses}</div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <div style="
-                width:12px;
-                height:12px;
-                border-radius:50%;
-                background:${autoColor.body};
-                box-shadow:0 0 8px ${autoColor.wand};
-                border:1px solid rgba(255,255,255,0.45);
-              "></div>
-              <div style="font-size:12px; opacity:.78;">Auto color</div>
-            </div>
-          </div>
-        </div>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+  <div style="font-size:12px; opacity:.78;">W ${snapshot.wins} • L ${snapshot.losses}</div>
+</div>
       </div>
     </div>
   `;
