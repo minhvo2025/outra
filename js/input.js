@@ -1,4 +1,5 @@
 let desktopWallPrimed = false;
+
 // ── Joystick Factory ──────────────────────────────────────────
 function makeStickController(stickEl, thumbEl, state) {
   const maxBase = () => Math.max(28, stickEl.clientWidth * 0.3);
@@ -14,18 +15,31 @@ function makeStickController(stickEl, thumbEl, state) {
 
   const updateFromPoint = (clientX, clientY) => {
     const rect = stickEl.getBoundingClientRect();
-    const cx = rect.left + rect.width  / 2;
-    const cy = rect.top  + rect.height / 2;
-    let dx = clientX - cx, dy = clientY - cy;
-    const max  = maxBase();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let dx = clientX - cx;
+    let dy = clientY - cy;
+    const max = maxBase();
     const dist = Math.hypot(dx, dy);
-    if (dist > max) { dx = (dx / dist) * max; dy = (dy / dist) * max; }
-    const outX = dx / max, outY = dy / max;
-    if (Math.hypot(outX, outY) > 0.08) {
-      state.dx = outX; state.dy = outY; state.active = true;
-    } else {
-      state.active = false; state.dx = 0; state.dy = 0;
+
+    if (dist > max) {
+      dx = (dx / dist) * max;
+      dy = (dy / dist) * max;
     }
+
+    const outX = dx / max;
+    const outY = dy / max;
+
+    if (Math.hypot(outX, outY) > 0.08) {
+      state.dx = outX;
+      state.dy = outY;
+      state.active = true;
+    } else {
+      state.active = false;
+      state.dx = 0;
+      state.dy = 0;
+    }
+
     thumbEl.style.transform = `translate(${dx}px, ${dy}px)`;
   };
 
@@ -51,6 +65,7 @@ function makeStickController(stickEl, thumbEl, state) {
     e.preventDefault();
     reset();
   };
+
   stickEl.addEventListener('touchend', endTouch, { passive: false });
   stickEl.addEventListener('touchcancel', endTouch, { passive: false });
 
@@ -59,10 +74,12 @@ function makeStickController(stickEl, thumbEl, state) {
     state.mouseDown = true;
     updateFromPoint(e.clientX, e.clientY);
   });
+
   window.addEventListener('mousemove', (e) => {
     if (!state.mouseDown) return;
     updateFromPoint(e.clientX, e.clientY);
   });
+
   window.addEventListener('mouseup', () => {
     if (!state.mouseDown) return;
     reset();
@@ -75,25 +92,31 @@ function makeStickController(stickEl, thumbEl, state) {
 // ── Pull-to-Cast Mobile Button ────────────────────────────────
 function bindPullCastButton(btn, handler, skillType) {
   const arrow = btn.querySelector('.mobileDragArrow');
-  let touchId = null, mouseDown = false, aiming = false;
+  let touchId = null;
+  let mouseDown = false;
+  let aiming = false;
 
   function showArrow(dx, dy) {
     const len = Math.min(56, Math.max(18, Math.hypot(dx, dy)));
     const ang = Math.atan2(dy, dx);
-    arrow.style.display   = 'block';
-    arrow.style.width     = `${len}px`;
+    arrow.style.display = 'block';
+    arrow.style.width = `${len}px`;
     arrow.style.transform = `translate(0px, -2px) rotate(${ang}rad)`;
   }
-  function hideArrow() { arrow.style.display = 'none'; }
+
+  function hideArrow() {
+    arrow.style.display = 'none';
+  }
 
   function setAimFromPoint(clientX, clientY) {
-    const rect        = btn.getBoundingClientRect();
-    const cx          = rect.left + rect.width  / 2;
-    const cy          = rect.top  + rect.height / 2;
+    const rect = btn.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
     const sensitivity = Number(profile.aimSensitivity) || 0.7;
-    const dx          = (clientX - cx) * sensitivity;
-    const dy          = (clientY - cy) * sensitivity;
-    const len         = Math.hypot(dx, dy);
+    const dx = (clientX - cx) * sensitivity;
+    const dy = (clientY - cy) * sensitivity;
+    const len = Math.hypot(dx, dy);
+
     if (len > 8) {
       player.aimX = dx / len;
       player.aimY = dy / len;
@@ -101,13 +124,13 @@ function bindPullCastButton(btn, handler, skillType) {
       mouse.y = player.y + player.aimY * 140;
       showArrow(dx, dy);
       skillAimPreview.active = true;
-      skillAimPreview.type   = skillType;
-      skillAimPreview.dx     = player.aimX;
-      skillAimPreview.dy     = player.aimY;
+      skillAimPreview.type = skillType;
+      skillAimPreview.dx = player.aimX;
+      skillAimPreview.dy = player.aimY;
     } else {
       hideArrow();
       skillAimPreview.active = false;
-      skillAimPreview.type   = null;
+      skillAimPreview.type = null;
     }
   }
 
@@ -124,7 +147,7 @@ function bindPullCastButton(btn, handler, skillType) {
     hideArrow();
     aiming = false;
     skillAimPreview.active = false;
-    skillAimPreview.type   = null;
+    skillAimPreview.type = null;
     startMusicIfNeeded();
     handler();
   }
@@ -132,11 +155,11 @@ function bindPullCastButton(btn, handler, skillType) {
   function cancel() {
     btn.classList.remove('aiming');
     hideArrow();
-    aiming    = false;
-    touchId   = null;
+    aiming = false;
+    touchId = null;
     mouseDown = false;
     skillAimPreview.active = false;
-    skillAimPreview.type   = null;
+    skillAimPreview.type = null;
   }
 
   btn.addEventListener('touchstart', (e) => {
@@ -175,10 +198,12 @@ function bindPullCastButton(btn, handler, skillType) {
     mouseDown = true;
     begin(e.clientX, e.clientY);
   });
+
   window.addEventListener('mousemove', (e) => {
     if (!mouseDown || !aiming) return;
     setAimFromPoint(e.clientX, e.clientY);
   });
+
   window.addEventListener('mouseup', (e) => {
     if (!mouseDown || !aiming) return;
     finish(e.clientX, e.clientY);
@@ -280,10 +305,10 @@ window.addEventListener('keydown', (e) => {
 
   if (gameState !== 'lobby' && norm === keybinds.reset) resetRound();
 
-if (norm === keybinds.menu) {
-  e.preventDefault();
-  toggleMenu();
-}
+  if (norm === keybinds.menu) {
+    e.preventDefault();
+    toggleMenu();
+  }
 });
 
 window.addEventListener('keyup', (e) => {
@@ -306,12 +331,14 @@ window.addEventListener('keyup', (e) => {
 // ── Mouse ─────────────────────────────────────────────────────
 canvas.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
-  mouse.x    = e.clientX - rect.left;
-  mouse.y    = e.clientY - rect.top;
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
+
   if (!isTouchDevice) {
-    const aim    = normalized(mouse.x - player.x, mouse.y - player.y);
-    player.aimX  = aim.x;
-    player.aimY  = aim.y;
+    const aim = normalized(mouse.x - player.x, mouse.y - player.y);
+    player.aimX = aim.x;
+    player.aimY = aim.y;
+
     if (desktopWallPrimed) {
       skillAimPreview.active = true;
       skillAimPreview.type = 'wall';
@@ -324,6 +351,7 @@ canvas.addEventListener('mousemove', (e) => {
 canvas.addEventListener('mousedown', (e) => {
   if (gameState !== 'playing') return;
   startMusicIfNeeded();
+
   if (e.button === 0) castPlayerSpell('fire');
   else if (e.button === 2) castPlayerSpell('blink');
 });
@@ -335,16 +363,16 @@ canvas.addEventListener('touchstart', (e) => {
   const t = e.touches[0];
   if (!t) return;
   const rect = canvas.getBoundingClientRect();
-  mouse.x    = t.clientX - rect.left;
-  mouse.y    = t.clientY - rect.top;
+  mouse.x = t.clientX - rect.left;
+  mouse.y = t.clientY - rect.top;
 }, { passive: true });
 
 canvas.addEventListener('touchmove', (e) => {
   const t = e.touches[0];
   if (!t) return;
   const rect = canvas.getBoundingClientRect();
-  mouse.x    = t.clientX - rect.left;
-  mouse.y    = t.clientY - rect.top;
+  mouse.x = t.clientX - rect.left;
+  mouse.y = t.clientY - rect.top;
 }, { passive: true });
 
 function openMenu() {
@@ -373,7 +401,10 @@ function toggleMenu() {
 }
 
 // ── UI Button Events ──────────────────────────────────────────
-hudToggleBtn.addEventListener('click', () => { hudVisible = !hudVisible; updateHud(); });
+hudToggleBtn.addEventListener('click', () => {
+  hudVisible = !hudVisible;
+  updateHud();
+});
 
 menuBtn.addEventListener('click', toggleMenu);
 lobbyMenuBtn.addEventListener('click', toggleMenu);
@@ -381,6 +412,7 @@ lobbyMenuBtn.addEventListener('click', toggleMenu);
 document.querySelectorAll('[data-menu-tab]').forEach(btn =>
   btn.addEventListener('click', () => setMenuTab(btn.dataset.menuTab))
 );
+
 document.querySelectorAll('[data-lobby-tab]').forEach(btn =>
   btn.addEventListener('click', () => setLobbyTab(btn.dataset.lobbyTab))
 );
@@ -399,7 +431,11 @@ resetBtn.addEventListener('click', () => {
   closeMenu();
 });
 
-musicToggleBtn.addEventListener('click', () => { startMusicIfNeeded(); setMusicMuted(!musicMuted); updateHud(); });
+musicToggleBtn.addEventListener('click', () => {
+  startMusicIfNeeded();
+  setMusicMuted(!musicMuted);
+  updateHud();
+});
 
 standingDummyBtn.addEventListener('click', () => {
   spawnDummy('standing');
@@ -417,7 +453,7 @@ removeDummyBtn.addEventListener('click', () => {
 });
 
 menuResetBindsBtn.addEventListener('click', () => {
-  keybinds       = { ...defaultBinds };
+  keybinds = { ...defaultBinds };
   waitingForBind = null;
   buildKeybindsUI();
   saveProfile();
@@ -432,7 +468,10 @@ if (aimSensitivitySlider) {
   });
 }
 
-startBtn.addEventListener('click', (e) => { e.preventDefault(); startMatch(); });
+startBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  startMatch();
+});
 
 nameInput.addEventListener('input', () => {
   player.name = (nameInput.value || 'Player').trim().slice(0, 16) || 'Player';
@@ -440,19 +479,22 @@ nameInput.addEventListener('input', () => {
 });
 
 nameInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); startMatch(); }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    startMatch();
+  }
 });
 
 // ── Mobile Skill Buttons ──────────────────────────────────────
-bindPullCastButton(mobileFireBtn,     () => castPlayerSpell('fire'),   'fire');
-bindPullCastButton(mobileHookBtn,     () => castPlayerSpell('hook'),   'hook');
-bindPullCastButton(mobileTeleportBtn, () => castPlayerSpell('blink'),  'blink');
-bindPullCastButton(mobileShieldBtn,   () => castPlayerSpell('shield'), 'shield');
-bindPullCastButton(mobileChargeBtn,   () => castPlayerSpell('charge'), 'charge');
+bindPullCastButton(mobileFireBtn, () => castPlayerSpell('fire'), 'fire');
+bindPullCastButton(mobileHookBtn, () => castPlayerSpell('hook'), 'hook');
+bindPullCastButton(mobileTeleportBtn, () => castPlayerSpell('blink'), 'blink');
+bindPullCastButton(mobileShieldBtn, () => castPlayerSpell('shield'), 'shield');
+bindPullCastButton(mobileChargeBtn, () => castPlayerSpell('charge'), 'charge');
 bindPullCastButton(mobileShockBtn, () => castPlayerSpell('shock'), 'shock');
-bindPullCastButton(mobileGustBtn,  () => castPlayerSpell('gust'),  'gust');
-bindPullCastButton(mobileWallBtn,  () => castPlayerSpell('wall'),  'wall');
-bindPullCastButton(mobileRewindBtn,() => castPlayerSpell('rewind'),'rewind');
+bindPullCastButton(mobileGustBtn, () => castPlayerSpell('gust'), 'gust');
+bindPullCastButton(mobileWallBtn, () => castPlayerSpell('wall'), 'wall');
+bindPullCastButton(mobileRewindBtn, () => castPlayerSpell('rewind'), 'rewind');
 
 // ── Window Resize ─────────────────────────────────────────────
 window.addEventListener('resize', () => {
