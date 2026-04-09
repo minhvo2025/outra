@@ -57,6 +57,8 @@
       yawGroup: null,
       modelMount: null,
       rigFixNode: null,
+      lastWorldX: null,
+lastWorldZ: null,
     },
     dummy: {
       root: null,
@@ -72,6 +74,8 @@
       yawGroup: null,
       modelMount: null,
       rigFixNode: null,
+        lastWorldX: null,
+  lastWorldZ: null,
     },
   };
 
@@ -1416,8 +1420,19 @@ function prepareDummyModel(root, mountGroup) {
             state.player.yawGroup.rotation.y = -aimAngle - Math.PI * 0.5;
     }
 
-const moveSpeedSq = (player.vx * player.vx) + (player.vy * player.vy);
-const moved = moveSpeedSq > 16;
+let moved = false;
+
+if (state.player.lastWorldX != null && state.player.lastWorldZ != null) {
+  const dxWorld = world.x - state.player.lastWorldX;
+  const dzWorld = world.z - state.player.lastWorldZ;
+  const distSq = (dxWorld * dxWorld) + (dzWorld * dzWorld);
+
+  // Detect real visible movement from frame to frame.
+  moved = distSq > 0.01;
+}
+
+state.player.lastWorldX = world.x;
+state.player.lastWorldZ = world.z;
 
     if (state.player.hitTimer > 0) {
       state.player.hitTimer = Math.max(0, state.player.hitTimer - dt);
@@ -1473,8 +1488,18 @@ const moved = moveSpeedSq > 16;
             state.dummy.yawGroup.rotation.y = -aimAngle - Math.PI * 0.5;
     }
 
-const moveSpeedSq = (dummy.vx * dummy.vx) + (dummy.vy * dummy.vy);
-const moved = moveSpeedSq > 16;
+let moved = false;
+
+if (state.dummy.lastWorldX != null && state.dummy.lastWorldZ != null) {
+  const dxWorld = world.x - state.dummy.lastWorldX;
+  const dzWorld = world.z - state.dummy.lastWorldZ;
+  const distSq = (dxWorld * dxWorld) + (dzWorld * dzWorld);
+
+  moved = distSq > 0.01;
+}
+
+state.dummy.lastWorldX = world.x;
+state.dummy.lastWorldZ = world.z;
 
     if (state.dummy.hitTimer > 0) {
       state.dummy.hitTimer = Math.max(0, state.dummy.hitTimer - dt);
