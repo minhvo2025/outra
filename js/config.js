@@ -290,7 +290,7 @@ arenaCharacter: {
 },
 
   // Only used for aim/facing alignment after the model stands correctly.
-facingOffsetY: Math.PI / 2
+facingOffsetY: Math.PI / 2,
 
   animationSpeeds: {
     idle: 1.3,
