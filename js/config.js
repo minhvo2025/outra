@@ -287,19 +287,19 @@ window.OUTRA_3D_CONFIG = {
     // Arena model was getting flipped twice.
     // Keep base rotation neutral here.
     baseRotation: {
-      x: 0,
+      x: Math.PI,
       y: 0,
       z: 0,
     },
 
     // Speed multipliers to make arena feel snappier again.
     animationSpeeds: {
-      idle: 1.0,
+      idle: 1.3,
       walk: 1.15,
       run: 1.3,
-      cast: 1.2,
+      cast: 1.5,
       dash: 1.35,
-      hit: 1.15,
+      hit: 2.1,
     },
   },
 
