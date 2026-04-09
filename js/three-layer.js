@@ -75,16 +75,10 @@
     },
   };
 
-function getArenaModelBaseEuler() {
+function getArenaFacingOffset() {
   const charCfg = cfg.arenaCharacter || {};
-  const baseRotation = charCfg.baseRotation || {};
-
-  return new THREE.Euler(
-    typeof baseRotation.x === 'number' ? baseRotation.x : 0,
-    typeof baseRotation.y === 'number' ? baseRotation.y : 0,
-    typeof baseRotation.z === 'number' ? baseRotation.z : 0,
-    'XYZ'
-  );
+  const facingOffset = Number(charCfg.facingOffsetY);
+  return Number.isFinite(facingOffset) ? facingOffset : 0;
 }
 
   function log(...args) {
@@ -484,18 +478,24 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
 
   stylizeModel(root);
 
-  // Reset root completely.
-  // Arena orientation should come only from config baseRotation.
+  // Full hard reset before normalization.
   root.position.set(0, 0, 0);
   root.rotation.set(0, 0, 0);
   root.scale.set(1, 1, 1);
   root.updateMatrixWorld(true);
 
+  // IMPORTANT:
+  // Arena must also normalize the imported model to Y-up,
+  // same principle as preview.
+  const normalizeInfo = normalizeRootUpAxis(root, {
+    allowAutoRotate: true
+  });
+
   let box = computeBox(root);
   let size = new THREE.Vector3();
   box.getSize(size);
 
-  // Scale by the tallest dimension after import reset.
+  // Scale by actual standing height after normalization.
   const sourceHeight = Math.max(size.y || 1, 1);
   const targetHeight = targetHeightOverride || cfg.actorHeight || 95;
   const scale = targetHeight / sourceHeight;
@@ -508,13 +508,14 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
 
   const center = new THREE.Vector3();
   const min = new THREE.Vector3();
+  const sizeAfterScale = new THREE.Vector3();
+
   box.getCenter(center);
+  box.getSize(sizeAfterScale);
   min.copy(box.min);
 
-  // IMPORTANT:
-  // Center only on X/Z so turning happens around the character body center,
-  // but anchor Y to the bottom so the model stands on the arena instead of
-  // orbiting around its own middle.
+  // Center on X/Z only.
+  // Keep feet grounded by anchoring Y to box.min.y.
   root.position.x -= center.x;
   root.position.z -= center.z;
   root.position.y -= min.y;
@@ -523,7 +524,8 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
   root.updateMatrixWorld(true);
 
   log('Prepared arena model transform', {
-    size: size.x.toFixed(1) + ' x ' + size.y.toFixed(1) + ' x ' + size.z.toFixed(1),
+    rotatedFromAxis: normalizeInfo.sourceAxis,
+    size: `${sizeAfterScale.x.toFixed(1)} x ${sizeAfterScale.y.toFixed(1)} x ${sizeAfterScale.z.toFixed(1)}`,
     scale: scale.toFixed(2),
   });
 }
@@ -563,20 +565,15 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
     return namedRig || root;
   }
 
-  function applyArenaModelBaseRotation(mount) {
-    if (!mount) return;
+function applyArenaModelBaseRotation(mount) {
+  if (!mount) return;
 
-    const baseEuler = getArenaModelBaseEuler();
-
-    mount.rotation.set(
-      baseEuler.x,
-      baseEuler.y,
-      baseEuler.z
-    );
-
-    mount.position.set(0, 0, 0);
-    mount.updateMatrixWorld(true);
-  }
+  // Arena mount should only control facing offset around Y.
+  // Up-axis correction is handled inside prepareArenaModelTransform().
+  mount.rotation.set(0, getArenaFacingOffset(), 0);
+  mount.position.set(0, 0, 0);
+  mount.updateMatrixWorld(true);
+}
 
   function prepareArenaModel(root, mountGroup) {
     prepareArenaModelTransform(root, cfg.actorHeight || 95);
