@@ -2,10 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  />
   <title>Outra</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/png" href="/docs/art/logo.png">
+  <link rel="icon" type="image/png" href="/docs/art/logo.png" />
 </head>
 <body>
   <div id="stage">
@@ -33,48 +36,56 @@
       <div class="deskSpellLabel">Fire</div>
       <div class="deskSpellKey">M1</div>
     </div>
+
     <div class="deskSpell" id="dspell-hook">
       <div class="deskSpellIcon">🪝</div>
       <div class="deskSpellCooldown" id="dcd-hook"></div>
       <div class="deskSpellLabel">Hook</div>
       <div class="deskSpellKey" id="dkey-hook">E</div>
     </div>
+
     <div class="deskSpell" id="dspell-blink">
       <div class="deskSpellIcon">✦</div>
       <div class="deskSpellCooldown" id="dcd-blink"></div>
       <div class="deskSpellLabel">Blink</div>
       <div class="deskSpellKey" id="dkey-blink">Space</div>
     </div>
+
     <div class="deskSpell" id="dspell-shield">
       <div class="deskSpellIcon">🛡️</div>
       <div class="deskSpellCooldown" id="dcd-shield"></div>
       <div class="deskSpellLabel">Shield</div>
       <div class="deskSpellKey" id="dkey-shield">Q</div>
     </div>
+
     <div class="deskSpell" id="dspell-charge">
       <div class="deskSpellIcon">⚡</div>
       <div class="deskSpellCooldown" id="dcd-charge"></div>
       <div class="deskSpellLabel">Charge</div>
       <div class="deskSpellKey" id="dkey-charge">F</div>
     </div>
+
     <div class="deskSpell" id="dspell-shock">
       <div class="deskSpellIcon">💥</div>
       <div class="deskSpellCooldown" id="dcd-shock"></div>
       <div class="deskSpellLabel">Shock</div>
       <div class="deskSpellKey" id="dkey-shock">C</div>
     </div>
+
     <div class="deskSpell" id="dspell-gust">
       <div class="deskSpellIcon">🌪️</div>
       <div class="deskSpellCooldown" id="dcd-gust"></div>
       <div class="deskSpellLabel">Gust</div>
       <div class="deskSpellKey" id="dkey-gust">X</div>
     </div>
+
     <div class="deskSpell" id="dspell-wall">
       <div class="deskSpellIcon">🧱</div>
       <div class="deskSpellCooldown" id="dcd-wall"></div>
       <div class="deskSpellLabel">Wall</div>
       <div class="deskSpellKey" id="dkey-wall">V</div>
     </div>
+
     <div class="deskSpell" id="dspell-rewind">
       <div class="deskSpellIcon">⏪</div>
       <div class="deskSpellCooldown" id="dcd-rewind"></div>
@@ -99,15 +110,68 @@
 
     <div class="mobileSide">
       <div class="mobileActions">
-        <button class="mobileBtn big mainSkill" id="mobileFireBtn"><span class="mobileBtnIcon">🔥</span><span class="mobileBtnCooldown"></span><span class="mobileBtnText">Fire</span><div class="mobileDragArrow"></div></button>
-        <button class="mobileBtn big subSkill" id="mobileHookBtn"><span class="mobileBtnIcon small">🪝</span><span class="mobileBtnCooldown"></span><span class="mobileBtnText">Hook</span><div class="mobileDragArrow"></div></button>
-        <button class="mobileBtn big subSkill" id="mobileTeleportBtn"><span class="mobileBtnIcon small">✦</span><span class="mobileBtnCooldown"></span><span class="mobileBtnText">Blink</span><div class="mobileDragArrow"></div></button>
-        <button class="mobileBtn big subSkill" id="mobileShieldBtn"><span class="mobileBtnIcon small">🛡️</span><span class="mobileBtnCooldown"></span><span class="mobileBtnText">Shield</span><div class="mobileDragArrow"></div></button>
-        <button class="mobileBtn big subSkill" id="mobileChargeBtn"><span class="mobileBtnIcon small">⚡</span><span class="mobileBtnCooldown"></span><span class="mobileBtnText">Charge</span><div class="mobileDragArrow"></div></button>
-        <button class="mobileBtn big subSkill" id="mobileShockBtn"><span class="mobileBtnIcon small">💥</span><span class="mobileBtnCooldown"></span><span class="mobileBtnText">Shock</span><div class="mobileDragArrow"></div></button>
-        <button class="mobileBtn big subSkill" id="mobileGustBtn"><span class="mobileBtnIcon small">🌪️</span><span class="mobileBtnCooldown"></span><span class="mobileBtnText">Gust</span><div class="mobileDragArrow"></div></button>
-        <button class="mobileBtn big subSkill" id="mobileWallBtn"><span class="mobileBtnIcon small">🧱</span><span class="mobileBtnCooldown"></span><span class="mobileBtnText">Wall</span><div class="mobileDragArrow"></div></button>
-        <button class="mobileBtn big subSkill" id="mobileRewindBtn"><span class="mobileBtnIcon small">⏪</span><span class="mobileBtnCooldown"></span><span class="mobileBtnText">Rewind</span><div class="mobileDragArrow"></div></button>
+        <button class="mobileBtn big mainSkill" id="mobileFireBtn">
+          <span class="mobileBtnIcon">🔥</span>
+          <span class="mobileBtnCooldown"></span>
+          <span class="mobileBtnText">Fire</span>
+          <div class="mobileDragArrow"></div>
+        </button>
+
+        <button class="mobileBtn big subSkill" id="mobileHookBtn">
+          <span class="mobileBtnIcon small">🪝</span>
+          <span class="mobileBtnCooldown"></span>
+          <span class="mobileBtnText">Hook</span>
+          <div class="mobileDragArrow"></div>
+        </button>
+
+        <button class="mobileBtn big subSkill" id="mobileTeleportBtn">
+          <span class="mobileBtnIcon small">✦</span>
+          <span class="mobileBtnCooldown"></span>
+          <span class="mobileBtnText">Blink</span>
+          <div class="mobileDragArrow"></div>
+        </button>
+
+        <button class="mobileBtn big subSkill" id="mobileShieldBtn">
+          <span class="mobileBtnIcon small">🛡️</span>
+          <span class="mobileBtnCooldown"></span>
+          <span class="mobileBtnText">Shield</span>
+          <div class="mobileDragArrow"></div>
+        </button>
+
+        <button class="mobileBtn big subSkill" id="mobileChargeBtn">
+          <span class="mobileBtnIcon small">⚡</span>
+          <span class="mobileBtnCooldown"></span>
+          <span class="mobileBtnText">Charge</span>
+          <div class="mobileDragArrow"></div>
+        </button>
+
+        <button class="mobileBtn big subSkill" id="mobileShockBtn">
+          <span class="mobileBtnIcon small">💥</span>
+          <span class="mobileBtnCooldown"></span>
+          <span class="mobileBtnText">Shock</span>
+          <div class="mobileDragArrow"></div>
+        </button>
+
+        <button class="mobileBtn big subSkill" id="mobileGustBtn">
+          <span class="mobileBtnIcon small">🌪️</span>
+          <span class="mobileBtnCooldown"></span>
+          <span class="mobileBtnText">Gust</span>
+          <div class="mobileDragArrow"></div>
+        </button>
+
+        <button class="mobileBtn big subSkill" id="mobileWallBtn">
+          <span class="mobileBtnIcon small">🧱</span>
+          <span class="mobileBtnCooldown"></span>
+          <span class="mobileBtnText">Wall</span>
+          <div class="mobileDragArrow"></div>
+        </button>
+
+        <button class="mobileBtn big subSkill" id="mobileRewindBtn">
+          <span class="mobileBtnIcon small">⏪</span>
+          <span class="mobileBtnCooldown"></span>
+          <span class="mobileBtnText">Rewind</span>
+          <div class="mobileDragArrow"></div>
+        </button>
       </div>
       <div class="mobileLabel">Main skill in center, others around it</div>
     </div>
@@ -173,7 +237,15 @@
       <div class="sectionTitle" style="margin-top:0; font-size:16px;">Aim Drag Sensitivity</div>
       <div class="hint">Lower makes dragging calmer and less twitchy.</div>
       <div class="row" style="margin-top:10px; align-items:center;">
-        <input id="aimSensitivitySlider" type="range" min="0.35" max="1.4" step="0.05" value="0.7" style="width:180px;" />
+        <input
+          id="aimSensitivitySlider"
+          type="range"
+          min="0.35"
+          max="1.4"
+          step="0.05"
+          value="0.7"
+          style="width:180px;"
+        />
         <span id="aimSensitivityValue" class="tag">0.70x</span>
       </div>
     </div>
@@ -224,7 +296,6 @@
 
             <div id="previewViewport" class="heroViewport immersiveViewport">
               <canvas id="previewCanvas" width="320" height="240"></canvas>
-              <div id="previewThreeLayer" aria-hidden="true"></div>
 
               <div class="heroParticles heroParticlesOrange"></div>
               <div class="heroParticles heroParticlesPurple"></div>
@@ -279,7 +350,7 @@
     </div>
   </div>
 
-  <!-- Scripts: config first (globals), main last (calls everything) -->
+  <!-- Scripts: config first, main last -->
   <script src="js/config.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/vendor/three.min.js"></script>
