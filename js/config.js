@@ -273,12 +273,12 @@ arenaCharacter: {
   glb: '/docs/art/character/Outron_arena.glb',
 
   animations: {
-    idle: 'Hit_Reaction_1',
-    walk: 'Shield_Push_Left',
-    run: 'Idle_5',
-    cast: 'Walking',
-    dash: 'Running',
-    hit: 'mage_soell_cast_4',
+  idle: 'Idle_4,
+    walk: 'Walking',
+    run: 'Running',
+    cast: 'mage_soell_cast_4',
+    dash: 'Shield_Push_Left',
+    hit: 'Hit_Reaction_1'
   },
 
 
