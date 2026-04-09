@@ -1377,7 +1377,7 @@ function getArenaModelBaseEuler() {
 
     const aimAngle = Math.atan2(player.aimY, player.aimX);
     if (state.player.yawGroup) {
-      state.player.yawGroup.rotation.y = -aimAngle + Math.PI * 0.5;
+            state.player.yawGroup.rotation.y = -aimAngle - Math.PI * 0.5;
     }
 
     const moved =
@@ -1435,7 +1435,7 @@ function getArenaModelBaseEuler() {
     const dy = player.y - dummy.y;
     const aimAngle = Math.atan2(dy, dx);
     if (state.dummy.yawGroup) {
-      state.dummy.yawGroup.rotation.y = -aimAngle + Math.PI * 0.5;
+            state.dummy.yawGroup.rotation.y = -aimAngle - Math.PI * 0.5;
     }
 
     const moved =
