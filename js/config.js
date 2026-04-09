@@ -287,7 +287,7 @@ window.OUTRA_3D_CONFIG = {
     // Arena model was getting flipped twice.
     // Keep base rotation neutral here.
     baseRotation: {
-      x: Math.PI,
+      x: -Math.PI / 2,
       y: 0,
       z: 0,
     },
