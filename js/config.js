@@ -295,7 +295,7 @@ facingOffsetY: Math.PI / 2,
   animationSpeeds: {
     idle: 1.3,
     walk: 1.15,
-    run: 1.3,
+    run: 1.0,
     cast: 1.5,
     dash: 1.35,
     hit: 2.1,
