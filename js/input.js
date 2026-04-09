@@ -510,6 +510,14 @@ if (aimSensitivitySlider) {
   });
 }
 
+if (musicVolumeSlider) {
+  musicVolumeSlider.addEventListener('input', () => {
+    startMusicIfNeeded();
+    setMusicVolume(musicVolumeSlider.value);
+    updateHud();
+  });
+}
+
 startBtn.addEventListener('click', (e) => {
   e.preventDefault();
   startMatch();
