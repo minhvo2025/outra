@@ -490,6 +490,7 @@ function renderStore() {
       drawLobbyPreview();
       updateHud();
       updateSkillCooldownButtons();
+      updateMusicVolumeUI();
     });
   });
 
@@ -688,5 +689,18 @@ function updateAimSensitivityUI() {
 
   if (aimSensitivityValue) {
     aimSensitivityValue.textContent = `${value.toFixed(2)}x`;
+  }
+}
+
+function updateMusicVolumeUI() {
+  const value = Math.min(1, Math.max(0, Number(profile.musicVolume) || 0.38));
+  profile.musicVolume = value;
+
+  if (musicVolumeSlider) {
+    musicVolumeSlider.value = value.toFixed(2);
+  }
+
+  if (musicVolumeValue) {
+    musicVolumeValue.textContent = `${Math.round(value * 100)}%`;
   }
 }

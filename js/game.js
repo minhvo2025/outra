@@ -32,15 +32,19 @@ function loadProfile() {
       keybinds = { ...defaultBinds, ...data.keybinds };
     }
 
-    if (data.profile && typeof data.profile === 'object') {
-      profile.wlk = Number(data.profile.wlk) || 0;
-      profile.musicMuted = !!data.profile.musicMuted;
+if (data.profile && typeof data.profile === 'object') {
+  profile.wlk = Number(data.profile.wlk) || 0;
+  profile.musicMuted = !!data.profile.musicMuted;
 
-      if (typeof data.profile.aimSensitivity === 'number') {
-        profile.aimSensitivity = data.profile.aimSensitivity;
-      }
+  if (typeof data.profile.musicVolume === 'number') {
+    profile.musicVolume = Math.min(1, Math.max(0, data.profile.musicVolume));
+  }
 
-      if (data.profile.ranked && typeof data.profile.ranked === 'object') {
+  if (typeof data.profile.aimSensitivity === 'number') {
+    profile.aimSensitivity = data.profile.aimSensitivity;
+  }
+
+  if (data.profile.ranked && typeof data.profile.ranked === 'object') {
         profile.ranked.mmr = Math.max(0, Number(data.profile.ranked.mmr) || 0);
         profile.ranked.wins = Math.max(0, Number(data.profile.ranked.wins) || 0);
         profile.ranked.losses = Math.max(0, Number(data.profile.ranked.losses) || 0);
@@ -56,11 +60,17 @@ function loadProfile() {
     }
   } catch {}
 
-  musicMuted = profile.musicMuted;
-  if (typeof profile.aimSensitivity !== 'number') profile.aimSensitivity = 0.7;
-  if (!profile.ranked) {
-    profile.ranked = { mmr: 0, wins: 0, losses: 0, zeroStarLossBuffer: 0 };
-  }
+musicMuted = profile.musicMuted;
+
+if (typeof profile.musicVolume !== 'number') {
+  profile.musicVolume = 0.38;
+}
+profile.musicVolume = Math.min(1, Math.max(0, profile.musicVolume));
+
+if (typeof profile.aimSensitivity !== 'number') profile.aimSensitivity = 0.7;
+if (!profile.ranked) {
+  profile.ranked = { mmr: 0, wins: 0, losses: 0, zeroStarLossBuffer: 0 };
+}
 }
 
 // ── Leaderboard ───────────────────────────────────────────────

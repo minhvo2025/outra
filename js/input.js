@@ -378,10 +378,12 @@ canvas.addEventListener('touchmove', (e) => {
 function openMenu() {
   menuOpen = true;
   menuPanel.style.display = 'block';
+
   requestAnimationFrame(() => {
     menuPanel.classList.add('open');
     document.body.classList.add('menuVisible');
   });
+
   setMenuTab(activeMenuTab);
 }
 
@@ -399,6 +401,20 @@ function toggleMenu() {
   if (menuOpen) closeMenu();
   else openMenu();
 }
+
+document.addEventListener('pointerdown', (e) => {
+  if (!menuOpen) return;
+  if (!menuPanel.classList.contains('open')) return;
+
+  const clickedInsideMenu = menuPanel.contains(e.target);
+  const clickedMenuButton =
+    menuBtn.contains(e.target) ||
+    lobbyMenuBtn.contains(e.target);
+
+  if (!clickedInsideMenu && !clickedMenuButton) {
+    closeMenu();
+  }
+});
 
 // ── UI Button Events ──────────────────────────────────────────
 hudToggleBtn.addEventListener('click', () => {
@@ -491,6 +507,14 @@ if (aimSensitivitySlider) {
     profile.aimSensitivity = Math.min(1.4, Math.max(0.35, Number(aimSensitivitySlider.value) || 0.7));
     updateAimSensitivityUI();
     saveProfile();
+  });
+}
+
+if (musicVolumeSlider) {
+  musicVolumeSlider.addEventListener('input', () => {
+    startMusicIfNeeded();
+    setMusicVolume(musicVolumeSlider.value);
+    updateHud();
   });
 }
 

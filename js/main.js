@@ -33,6 +33,7 @@ player.score = getPlayerPoints(player.name);
 
 renderLeaderboard();
 updateAimSensitivityUI();
+updateMusicVolumeUI();
 setMusicMuted(musicMuted);
 drawLobbyPreview();
 updateHud();

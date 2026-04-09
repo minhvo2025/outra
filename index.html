@@ -233,23 +233,37 @@
       </div>
     </div>
 
-    <div id="menuSettings" class="menuPage">
-      <div class="sectionTitle" style="margin-top:0; font-size:16px;">Aim Drag Sensitivity</div>
-      <div class="hint">Lower makes dragging calmer and less twitchy.</div>
-      <div class="row" style="margin-top:10px; align-items:center;">
-        <input
-          id="aimSensitivitySlider"
-          type="range"
-          min="0.35"
-          max="1.4"
-          step="0.05"
-          value="0.7"
-          style="width:180px;"
-        />
-        <span id="aimSensitivityValue" class="tag">0.70x</span>
-      </div>
-    </div>
+<div id="menuSettings" class="menuPage">
+  <div class="sectionTitle" style="margin-top:0; font-size:16px;">Aim Drag Sensitivity</div>
+  <div class="hint">Lower makes dragging calmer and less twitchy.</div>
+  <div class="row" style="margin-top:10px; align-items:center;">
+    <input
+      id="aimSensitivitySlider"
+      type="range"
+      min="0.35"
+      max="1.4"
+      step="0.05"
+      value="0.7"
+      style="width:180px;"
+    />
+    <span id="aimSensitivityValue" class="tag">0.70x</span>
   </div>
+
+  <div class="sectionTitle" style="font-size:16px;">Music Volume</div>
+  <div class="hint">Adjust the lobby music volume.</div>
+  <div class="row" style="margin-top:10px; align-items:center;">
+    <input
+      id="musicVolumeSlider"
+      type="range"
+      min="0"
+      max="1"
+      step="0.01"
+      value="0.38"
+      style="width:180px;"
+    />
+    <span id="musicVolumeValue" class="tag">38%</span>
+  </div>
+</div>
 
   <div id="overlay">
     <div class="panel lobbyShell">

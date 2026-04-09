@@ -349,6 +349,7 @@ const moveStick = {
 const profile = {
   wlk: 0,
   musicMuted: false,
+  musicVolume: 0.38,
   aimSensitivity: 0.7,
   ranked: {
     mmr: 0,
@@ -538,6 +539,8 @@ const bindList = document.getElementById('menuBindList');
 
 const aimSensitivitySlider = document.getElementById('aimSensitivitySlider');
 const aimSensitivityValue = document.getElementById('aimSensitivityValue');
+const musicVolumeSlider = document.getElementById('musicVolumeSlider');
+const musicVolumeValue = document.getElementById('musicVolumeValue');
 
 const nameInput = document.getElementById('nameInput');
 const colorRow = document.getElementById('colorRow');

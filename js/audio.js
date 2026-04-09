@@ -8,7 +8,35 @@ let lobbyMusicAudio = null;
 let lobbyMusicSource = null;
 
 const LOBBY_MUSIC_SRC = '/docs/Music/Lobby_music.mp3';
-const LOBBY_MUSIC_VOLUME = 0.38;
+const DEFAULT_LOBBY_MUSIC_VOLUME = 0.38;
+
+function getMusicVolume() {
+  const raw = Number(profile?.musicVolume);
+  return Math.min(1, Math.max(0, Number.isFinite(raw) ? raw : DEFAULT_LOBBY_MUSIC_VOLUME));
+}
+
+function applyMusicGain() {
+  if (!musicMasterGain) return;
+  musicMasterGain.gain.value = musicMuted ? 0 : getMusicVolume();
+}
+
+function setMusicVolume(value) {
+  const next = Math.min(1, Math.max(0, Number(value) || 0));
+  profile.musicVolume = next;
+
+  ensureAudioReady();
+  applyMusicGain();
+
+  if (!musicMuted && musicUnlocked) {
+    startLobbyMusicPlayback();
+  }
+
+  saveProfile();
+
+  if (typeof updateMusicVolumeUI === 'function') {
+    updateMusicVolumeUI();
+  }
+}
 
 // ── Core Audio Helpers ────────────────────────────────────────
 function ensureAudioReady() {
@@ -16,11 +44,11 @@ function ensureAudioReady() {
     audioCtx.resume();
   }
 
-  if (!musicMasterGain) {
-    musicMasterGain = audioCtx.createGain();
-    musicMasterGain.gain.value = musicMuted ? 0 : LOBBY_MUSIC_VOLUME;
-    musicMasterGain.connect(audioCtx.destination);
-  }
+if (!musicMasterGain) {
+  musicMasterGain = audioCtx.createGain();
+  musicMasterGain.gain.value = musicMuted ? 0 : getMusicVolume();
+  musicMasterGain.connect(audioCtx.destination);
+}
 }
 
 function ensureLobbyMusicElement() {
@@ -79,9 +107,7 @@ function setMusicMuted(value) {
 
   ensureAudioReady();
 
-  if (musicMasterGain) {
-    musicMasterGain.gain.value = musicMuted ? 0 : LOBBY_MUSIC_VOLUME;
-  }
+applyMusicGain();
 
   if (musicMuted) {
     pauseLobbyMusicPlayback();
