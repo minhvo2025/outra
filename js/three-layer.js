@@ -475,7 +475,7 @@ function getArenaFacingOffset() {
     });
   }
 
-function prepareArenaModelTransform(root, targetHeightOverride) {
+function prepareArenaModelTransform(root, mountGroup, targetHeightOverride) {
   traverseMeshes(root, (obj) => {
     obj.castShadow = false;
     obj.receiveShadow = false;
@@ -490,19 +490,37 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
 
   stylizeModel(root);
 
-  // Hard reset.
+  // Leave the raw GLTF root clean.
   root.position.set(0, 0, 0);
   root.rotation.set(0, 0, 0);
   root.scale.set(1, 1, 1);
   root.updateMatrixWorld(true);
 
-  // MANUAL import rotation only.
-  // No more auto axis guessing for arena.
-  const importEuler = getArenaManualRotationEuler();
-  root.rotation.set(importEuler.x, importEuler.y, importEuler.z);
-  root.updateMatrixWorld(true);
+  // Wrapper hierarchy:
+  // mountGroup (already controlled by yaw/facing)
+  //   -> pivotGroup (stable local pivot at 0,0,0)
+  //      -> orientGroup (manual import rotation + centered visual)
+  //         -> root (raw animated GLTF)
+  const pivotGroup = new THREE.Group();
+  const orientGroup = new THREE.Group();
 
-  let box = computeBox(root);
+  pivotGroup.position.set(0, 0, 0);
+  pivotGroup.rotation.set(0, 0, 0);
+  pivotGroup.scale.set(1, 1, 1);
+
+  orientGroup.position.set(0, 0, 0);
+  orientGroup.scale.set(1, 1, 1);
+
+  const importEuler = getArenaManualRotationEuler();
+  orientGroup.rotation.set(importEuler.x, importEuler.y, importEuler.z);
+
+  orientGroup.add(root);
+  pivotGroup.add(orientGroup);
+  mountGroup.add(pivotGroup);
+
+  orientGroup.updateMatrixWorld(true);
+
+  let box = computeBox(pivotGroup);
   let size = new THREE.Vector3();
   box.getSize(size);
 
@@ -510,11 +528,10 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
   const targetHeight = targetHeightOverride || cfg.actorHeight || 95;
   const scale = targetHeight / sourceHeight;
 
-  root.scale.setScalar(scale);
-  root.updateMatrixWorld(true);
+  orientGroup.scale.setScalar(scale);
+  orientGroup.updateMatrixWorld(true);
 
-  // Recompute after manual rotation + scale.
-  box = computeBox(root);
+  box = computeBox(pivotGroup);
 
   const center = new THREE.Vector3();
   const min = new THREE.Vector3();
@@ -524,13 +541,15 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
   box.getSize(sizeAfterScale);
   min.copy(box.min);
 
-  // Center X/Z, ground on Y.
-  root.position.x -= center.x;
-  root.position.z -= center.z;
-  root.position.y -= min.y;
-  root.position.y += (cfg.hoverHeight || 0);
+  // IMPORTANT:
+  // Offset the visual wrapper, not the raw root.
+  // This keeps the pivot stable when yawGroup rotates.
+  orientGroup.position.x -= center.x;
+  orientGroup.position.z -= center.z;
+  orientGroup.position.y -= min.y;
+  orientGroup.position.y += (cfg.hoverHeight || 0);
 
-  root.updateMatrixWorld(true);
+  orientGroup.updateMatrixWorld(true);
 
   log('Prepared arena model transform', {
     importRotation: {
@@ -588,27 +607,25 @@ function applyArenaModelBaseRotation(mount) {
   mount.updateMatrixWorld(true);
 }
 
-  function prepareArenaModel(root, mountGroup) {
-    prepareArenaModelTransform(root, cfg.actorHeight || 95);
-    tintModel(root, player.bodyColor, player.wandColor);
-    root.visible = true;
-    mountGroup.add(root);
+function prepareArenaModel(root, mountGroup) {
+  prepareArenaModelTransform(root, mountGroup, cfg.actorHeight || 95);
+  tintModel(root, player.bodyColor, player.wandColor);
+  root.visible = true;
 
-    state.player.rigFixNode = null;
+  state.player.rigFixNode = null;
 
-    log('Prepared arena model');
-  }
+  log('Prepared arena model');
+}
 
-  function prepareDummyModel(root, mountGroup) {
-    prepareArenaModelTransform(root, cfg.actorHeight || 95);
-    tintModel(root, '#ffd8b8', '#ff7a1a');
-    root.visible = true;
-    mountGroup.add(root);
+function prepareDummyModel(root, mountGroup) {
+  prepareArenaModelTransform(root, mountGroup, cfg.actorHeight || 95);
+  tintModel(root, '#ffd8b8', '#ff7a1a');
+  root.visible = true;
 
-    state.dummy.rigFixNode = null;
+  state.dummy.rigFixNode = null;
 
-    log('Prepared dummy model');
-  }
+  log('Prepared dummy model');
+}
 
   function preparePreviewModel(root, parentGroup) {
     const previewSettings = getPreviewSettings();
@@ -1221,9 +1238,11 @@ function applyArenaModelBaseRotation(mount) {
       const slotState = state[slot];
       if (!slotState || !slotState.modelMount) return;
 
-      if (slotState.root) {
-        slotState.modelMount.remove(slotState.root);
+      // Clear the whole mount so no old wrapper/pivot nodes remain.
+      while (slotState.modelMount.children.length) {
+        slotState.modelMount.remove(slotState.modelMount.children[0]);
       }
+      applyArenaModelBaseRotation(slotState.modelMount);
 
       const root = sourceScene;
       prepareFn(root, slotState.modelMount);
