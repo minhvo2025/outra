@@ -1440,8 +1440,17 @@ body.storeOpen {
   padding: 8px 6px 0;
 }
 
+.lobbyTopLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: start;
+}
+
 #lobbyMenuBtn,
-.lobbyMenuBtn {
+.lobbyMenuBtn,
+#lobbyStoreBtn,
+.lobbyStoreBtn {
   justify-self: start;
 }
 
@@ -2046,10 +2055,18 @@ body.storeOpen {
     min-height: unset;
   }
 
-  #lobbyMenuBtn,
-  .lobbyMenuBtn {
-    justify-self: center;
-  }
+.lobbyTopLeft {
+  justify-self: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#lobbyMenuBtn,
+.lobbyMenuBtn,
+#lobbyStoreBtn,
+.lobbyStoreBtn {
+  justify-self: center;
+}
 
   .lobbyTopRight {
     justify-self: center;
