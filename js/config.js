@@ -269,39 +269,31 @@ window.OUTRA_3D_CONFIG = {
     },
   },
 
- arenaCharacter: {
-    glb: '/docs/art/character/Outron_arena.glb',
+arenaCharacter: {
+  glb: '/docs/art/character/Outron_arena.glb',
 
-    // Leave clip names as they are for now since these are the names
-    // your current model setup is using.
-    animations: {
-      idle: 'Hit_Reaction_1',
-      walk: 'Idle_5',
-      run: 'Idle_5',
-      cast: 'Walking',
-      dash: 'Running',
-      hit: 'mage_soell_cast_4',
-    },
-
-    // IMPORTANT:
-    // Arena model was getting flipped twice.
-    // Keep base rotation neutral here.
-    baseRotation: {
-      x: 0,
-      y: 0,
-      z: 0,
-    },
-
-    // Speed multipliers to make arena feel snappier again.
-    animationSpeeds: {
-      idle: 1.3,
-      walk: 1.15,
-      run: 1.3,
-      cast: 1.5,
-      dash: 1.35,
-      hit: 2.1,
-    },
+  animations: {
+    idle: 'Hit_Reaction_1',
+    walk: 'Idle_5',
+    run: 'Idle_5',
+    cast: 'Walking',
+    dash: 'Running',
+    hit: 'mage_soell_cast_4',
   },
+
+  // ONLY used to rotate the already-upright arena model
+  // so it faces the correct aim direction.
+  facingOffsetY: 0,
+
+  animationSpeeds: {
+    idle: 1.3,
+    walk: 1.15,
+    run: 1.3,
+    cast: 1.5,
+    dash: 1.35,
+    hit: 2.1,
+  },
+},
 
   arenaFloor: {
     enabled: false,
