@@ -75,6 +75,18 @@
     },
   };
 
+function getArenaManualRotationEuler() {
+  const charCfg = cfg.arenaCharacter || {};
+  const importRotation = charCfg.importRotation || {};
+
+  return new THREE.Euler(
+    typeof importRotation.x === 'number' ? importRotation.x : 0,
+    typeof importRotation.y === 'number' ? importRotation.y : 0,
+    typeof importRotation.z === 'number' ? importRotation.z : 0,
+    'XYZ'
+  );
+}
+
 function getArenaFacingOffset() {
   const charCfg = cfg.arenaCharacter || {};
   const facingOffset = Number(charCfg.facingOffsetY);
@@ -478,24 +490,22 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
 
   stylizeModel(root);
 
-  // Full hard reset before normalization.
+  // Hard reset.
   root.position.set(0, 0, 0);
   root.rotation.set(0, 0, 0);
   root.scale.set(1, 1, 1);
   root.updateMatrixWorld(true);
 
-  // IMPORTANT:
-  // Arena must also normalize the imported model to Y-up,
-  // same principle as preview.
-  const normalizeInfo = normalizeRootUpAxis(root, {
-    allowAutoRotate: true
-  });
+  // MANUAL import rotation only.
+  // No more auto axis guessing for arena.
+  const importEuler = getArenaManualRotationEuler();
+  root.rotation.set(importEuler.x, importEuler.y, importEuler.z);
+  root.updateMatrixWorld(true);
 
   let box = computeBox(root);
   let size = new THREE.Vector3();
   box.getSize(size);
 
-  // Scale by actual standing height after normalization.
   const sourceHeight = Math.max(size.y || 1, 1);
   const targetHeight = targetHeightOverride || cfg.actorHeight || 95;
   const scale = targetHeight / sourceHeight;
@@ -503,7 +513,7 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
   root.scale.setScalar(scale);
   root.updateMatrixWorld(true);
 
-  // Recompute after scale.
+  // Recompute after manual rotation + scale.
   box = computeBox(root);
 
   const center = new THREE.Vector3();
@@ -514,8 +524,7 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
   box.getSize(sizeAfterScale);
   min.copy(box.min);
 
-  // Center on X/Z only.
-  // Keep feet grounded by anchoring Y to box.min.y.
+  // Center X/Z, ground on Y.
   root.position.x -= center.x;
   root.position.z -= center.z;
   root.position.y -= min.y;
@@ -524,7 +533,11 @@ function prepareArenaModelTransform(root, targetHeightOverride) {
   root.updateMatrixWorld(true);
 
   log('Prepared arena model transform', {
-    rotatedFromAxis: normalizeInfo.sourceAxis,
+    importRotation: {
+      x: importEuler.x,
+      y: importEuler.y,
+      z: importEuler.z,
+    },
     size: `${sizeAfterScale.x.toFixed(1)} x ${sizeAfterScale.y.toFixed(1)} x ${sizeAfterScale.z.toFixed(1)}`,
     scale: scale.toFixed(2),
   });
