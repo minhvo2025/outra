@@ -469,53 +469,64 @@ function getArenaModelBaseEuler() {
     });
   }
 
-  function prepareArenaModelTransform(root, targetHeightOverride) {
-    traverseMeshes(root, (obj) => {
-      obj.castShadow = false;
-      obj.receiveShadow = false;
-      obj.frustumCulled = false;
+function prepareArenaModelTransform(root, targetHeightOverride) {
+  traverseMeshes(root, (obj) => {
+    obj.castShadow = false;
+    obj.receiveShadow = false;
+    obj.frustumCulled = false;
 
-      if (Array.isArray(obj.material)) {
-        obj.material = obj.material.map(cloneMaterial);
-      } else if (obj.material) {
-        obj.material = cloneMaterial(obj.material);
-      }
-    });
+    if (Array.isArray(obj.material)) {
+      obj.material = obj.material.map(cloneMaterial);
+    } else if (obj.material) {
+      obj.material = cloneMaterial(obj.material);
+    }
+  });
 
-    stylizeModel(root);
+  stylizeModel(root);
 
-    // Reset root completely. No auto-rotation here — orientation is handled
-    // entirely by modelMount's baseRotation (applyArenaModelBaseRotation).
-    root.position.set(0, 0, 0);
-    root.rotation.set(0, 0, 0);
-    root.scale.set(1, 1, 1);
-    root.updateMatrixWorld(true);
+  // Reset root completely.
+  // Arena orientation should come only from config baseRotation.
+  root.position.set(0, 0, 0);
+  root.rotation.set(0, 0, 0);
+  root.scale.set(1, 1, 1);
+  root.updateMatrixWorld(true);
 
-    let box = computeBox(root);
-    let size = new THREE.Vector3();
-    box.getSize(size);
+  let box = computeBox(root);
+  let size = new THREE.Vector3();
+  box.getSize(size);
 
-    // Use the largest dimension for scaling so the model fits regardless of axis orientation.
-    const maxDim = Math.max(size.x, size.y, size.z, 1);
-    const targetHeight = targetHeightOverride || cfg.actorHeight || 95;
-    const scale = targetHeight / maxDim;
+  // Scale by the tallest dimension after import reset.
+  const sourceHeight = Math.max(size.y || 1, 1);
+  const targetHeight = targetHeightOverride || cfg.actorHeight || 95;
+  const scale = targetHeight / sourceHeight;
 
-    root.scale.setScalar(scale);
-    root.updateMatrixWorld(true);
+  root.scale.setScalar(scale);
+  root.updateMatrixWorld(true);
 
-    // Fully center the model on all axes so it doesn't orbit around a misaligned GLB pivot.
-    box = computeBox(root);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    root.position.sub(center);
-    root.position.y += (cfg.hoverHeight || 0);
-    root.updateMatrixWorld(true);
+  // Recompute after scale.
+  box = computeBox(root);
 
-    log('Prepared arena model transform', {
-      size: size.x.toFixed(1) + ' x ' + size.y.toFixed(1) + ' x ' + size.z.toFixed(1),
-      scale: scale.toFixed(2),
-    });
-  }
+  const center = new THREE.Vector3();
+  const min = new THREE.Vector3();
+  box.getCenter(center);
+  min.copy(box.min);
+
+  // IMPORTANT:
+  // Center only on X/Z so turning happens around the character body center,
+  // but anchor Y to the bottom so the model stands on the arena instead of
+  // orbiting around its own middle.
+  root.position.x -= center.x;
+  root.position.z -= center.z;
+  root.position.y -= min.y;
+  root.position.y += (cfg.hoverHeight || 0);
+
+  root.updateMatrixWorld(true);
+
+  log('Prepared arena model transform', {
+    size: size.x.toFixed(1) + ' x ' + size.y.toFixed(1) + ' x ' + size.z.toFixed(1),
+    scale: scale.toFixed(2),
+  });
+}
   
   function findRigFixNode(root) {
     if (!root) return null;
