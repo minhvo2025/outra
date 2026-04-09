@@ -507,8 +507,13 @@ function getArenaModelBaseEuler() {
     root.updateMatrixWorld(true);
 
     box = computeBox(root);
+    let center = new THREE.Vector3();
+    box.getCenter(center);
 
-    // Only ground vertically. Leave X/Z pivot untouched.
+    // Center X/Z so the model doesn't orbit around a misaligned GLB pivot.
+    root.position.x -= center.x;
+    root.position.z -= center.z;
+    // Ground vertically so feet sit at Y=0.
     root.position.y -= box.min.y;
     root.position.y += (cfg.hoverHeight || 0);
     root.updateMatrixWorld(true);
