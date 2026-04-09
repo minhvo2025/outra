@@ -843,7 +843,7 @@
     canvas3d.style.height = `${canvas2d.clientHeight}px`;
     canvas3d.style.pointerEvents = 'auto';
     canvas3d.style.background = 'transparent';
-    canvas3d.style.borderRadius = '14px';
+    canvas3d.style.borderRadius = '0px';
     canvas3d.style.zIndex = '3';
 
     state.preview.host.appendChild(canvas3d);
