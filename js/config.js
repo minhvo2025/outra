@@ -274,7 +274,7 @@ arenaCharacter: {
 
   animations: {
     idle: 'Hit_Reaction_1',
-    walk: 'Idle_5',
+    walk: 'Shield_Push_Left',
     run: 'Idle_5',
     cast: 'Walking',
     dash: 'Running',
