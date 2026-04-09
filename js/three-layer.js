@@ -347,8 +347,49 @@
     });
   }
 
+  function normalizeRootUpAxis(root, options = {}) {
+    const allowAutoRotate = options.allowAutoRotate !== false;
+    if (!allowAutoRotate) {
+      return { rotated: false, sourceAxis: 'y' };
+    }
+
+    root.rotation.set(0, 0, 0);
+    root.updateMatrixWorld(true);
+
+    let box = computeBox(root);
+    let size = new THREE.Vector3();
+    box.getSize(size);
+
+    const dims = {
+      x: Math.abs(size.x || 0),
+      y: Math.abs(size.y || 0),
+      z: Math.abs(size.z || 0),
+    };
+
+    let rotated = false;
+    let sourceAxis = 'y';
+
+    if (dims.z > dims.y * 1.12 && dims.z >= dims.x) {
+      root.rotation.x = -Math.PI / 2;
+      rotated = true;
+      sourceAxis = 'z';
+    } else if (dims.x > dims.y * 1.12 && dims.x >= dims.z) {
+      root.rotation.z = Math.PI / 2;
+      rotated = true;
+      sourceAxis = 'x';
+    }
+
+    if (rotated) {
+      root.updateMatrixWorld(true);
+      log(`Auto-rotated model from ${sourceAxis.toUpperCase()}-up to Y-up`);
+    }
+
+    return { rotated, sourceAxis };
+  }
+
+  
   function centerAndScaleModel(root, targetHeightOverride, options = {}) {
-    const autoRotateZUpToYUp = options.autoRotateZUpToYUp !== false;
+    const autoRotateToYUp = options.autoRotateZUpToYUp !== false;
 
     traverseMeshes(root, (obj) => {
       obj.castShadow = false;
@@ -364,23 +405,18 @@
 
     stylizeModel(root);
 
+    root.position.set(0, 0, 0);
+    root.scale.set(1, 1, 1);
+
+    const normalizeInfo = normalizeRootUpAxis(root, {
+      allowAutoRotate: autoRotateToYUp
+    });
+
     let box = computeBox(root);
     let center = new THREE.Vector3();
     let size = new THREE.Vector3();
     box.getCenter(center);
     box.getSize(size);
-
-    // IMPORTANT:
-    // Only do this auto-rotation when explicitly allowed.
-    // Your arena model is likely already in the correct up-axis,
-    // and this was flipping it into the wrong orientation.
-    if (autoRotateZUpToYUp && size.y < size.z) {
-      root.rotation.x = -Math.PI / 2;
-      box = computeBox(root);
-      box.getCenter(center);
-      box.getSize(size);
-      log('Auto-rotated model from Z-up to Y-up');
-    }
 
     root.position.sub(center);
 
@@ -393,19 +429,22 @@
     const scale = targetHeight / sourceHeight;
 
     root.scale.setScalar(scale);
+    root.updateMatrixWorld(true);
 
     box = computeBox(root);
     box.getCenter(center);
     box.getSize(size);
 
     root.position.y += (size.y * 0.5) + (cfg.hoverHeight || 0);
+    root.updateMatrixWorld(true);
 
     log('Prepared model size:', {
       x: size.x.toFixed(2),
       y: size.y.toFixed(2),
       z: size.z.toFixed(2),
       scale: scale.toFixed(2),
-      autoRotateZUpToYUp
+      autoRotateToYUp,
+      rotatedFromAxis: normalizeInfo.sourceAxis
     });
   }
 
@@ -424,13 +463,16 @@
 
     stylizeModel(root);
 
-    // IMPORTANT:
-    // For arena, keep the GLB pivot exactly as authored.
-    // Do NOT center on X/Z, otherwise the model can orbit when parent yaw rotates.
+    // Keep the authored pivot for arena rotation,
+    // but still normalize the up-axis so the model stands upright.
     root.position.set(0, 0, 0);
     root.rotation.set(0, 0, 0);
     root.scale.set(1, 1, 1);
     root.updateMatrixWorld(true);
+
+    const normalizeInfo = normalizeRootUpAxis(root, {
+      allowAutoRotate: true
+    });
 
     let box = computeBox(root);
     let size = new THREE.Vector3();
@@ -445,7 +487,7 @@
 
     box = computeBox(root);
 
-    // Only ground vertically. Leave X/Z untouched.
+    // Only ground vertically. Leave X/Z pivot untouched.
     root.position.y -= box.min.y;
     root.position.y += (cfg.hoverHeight || 0);
     root.updateMatrixWorld(true);
@@ -454,6 +496,7 @@
       sourceHeight: sourceHeight.toFixed(2),
       scale: scale.toFixed(2),
       minY: box.min.y.toFixed(2),
+      rotatedFromAxis: normalizeInfo.sourceAxis
     });
   }
   
@@ -1119,53 +1162,112 @@
 
     if (!state.loader) return;
 
+    const attachArenaInstance = (slot, gltf, prepareFn, setStateFn) => {
+      const sourceScene = gltf.scene || gltf.scenes?.[0];
+      if (!sourceScene) {
+        console.error('[Outra3D] Arena GLB loaded without a scene.');
+        return;
+      }
+
+      const slotState = state[slot];
+      if (!slotState || !slotState.modelMount) return;
+
+      if (slotState.root) {
+        slotState.modelMount.remove(slotState.root);
+      }
+
+      const root = sourceScene;
+      prepareFn(root, slotState.modelMount);
+      slotState.root = root;
+
+      const arenaAnimations = gltf.animations || [];
+      if (arenaAnimations.length) {
+        slotState.mixer = new THREE.AnimationMixer(root);
+        slotState.states = buildAnimationStateMap(arenaAnimations, slotState.mixer, 'arena');
+        const firstState = slotState.states.has('idle')
+          ? 'idle'
+          : (slotState.states.keys().next().value || null);
+
+        if (firstState) setStateFn(firstState, true);
+      } else {
+        slotState.mixer = null;
+        slotState.states = new Map();
+      }
+    };
+
     if (arenaCfg.glb) {
       state.loader.load(
         arenaCfg.glb,
         (gltf) => {
-          if (state.player.root) {
-            state.player.modelMount.remove(state.player.root);
-          }
-          if (state.dummy.root) {
-            state.dummy.modelMount.remove(state.dummy.root);
+          attachArenaInstance('player', gltf, prepareArenaModel, setArenaPlayerState);
+          state.ready = !!state.player.root;
+          tintAllLoadedModelsIfNeeded();
+          log('Arena player character loaded');
+        },
+        undefined,
+        (error) => {
+          console.error('[Outra3D] Failed to load arena player GLB:', error);
+        }
+      );
+
+      state.loader.load(
+        arenaCfg.glb,
+        (gltf) => {
+          attachArenaInstance('dummy', gltf, prepareDummyModel, setDummyState);
+          tintAllLoadedModelsIfNeeded();
+          log('Arena dummy character loaded');
+        },
+        undefined,
+        (error) => {
+          console.error('[Outra3D] Failed to load arena dummy GLB:', error);
+        }
+      );
+    }
+
+    if (previewCfg.glb) {
+      state.loader.load(
+        previewCfg.glb,
+        (gltf) => {
+          if (state.preview.root) {
+            state.preview.rootGroup.remove(state.preview.root);
           }
 
           const sourceScene = gltf.scene || gltf.scenes?.[0];
           if (!sourceScene) {
-            console.error('[Outra3D] Arena GLB loaded without a scene.');
+            console.error('[Outra3D] Preview GLB loaded without a scene.');
             return;
           }
 
-          const playerRoot = sourceScene.clone(true);
-          const dummyRoot = sourceScene.clone(true);
+          const previewRoot = sourceScene;
+          preparePreviewModel(previewRoot, state.preview.rootGroup);
+          state.preview.root = previewRoot;
 
-          prepareArenaModel(playerRoot, state.player.modelMount);
-          prepareDummyModel(dummyRoot, state.dummy.modelMount);
+          const previewAnimations = gltf.animations || [];
+          if (previewAnimations.length) {
+            state.preview.mixer = new THREE.AnimationMixer(previewRoot);
+            state.preview.states = buildAnimationStateMap(previewAnimations, state.preview.mixer, 'preview');
+            const firstState = state.preview.states.has('idle')
+              ? 'idle'
+              : (state.preview.states.keys().next().value || null);
 
-          state.player.root = playerRoot;
-          state.dummy.root = dummyRoot;
-
-          const arenaAnimations = gltf.animations || [];
-          if (arenaAnimations.length) {
-            state.player.mixer = new THREE.AnimationMixer(playerRoot);
-            state.player.states = buildAnimationStateMap(arenaAnimations, state.player.mixer, 'arena');
-            setArenaPlayerState(state.player.states.has('idle') ? 'idle' : (state.player.states.keys().next().value || null), true);
-
-            state.dummy.mixer = new THREE.AnimationMixer(dummyRoot);
-            state.dummy.states = buildAnimationStateMap(arenaAnimations, state.dummy.mixer, 'arena');
-            setDummyState(state.dummy.states.has('idle') ? 'idle' : (state.dummy.states.keys().next().value || null), true);
+            if (firstState) setPreviewState(firstState, true);
+          } else {
+            state.preview.mixer = null;
+            state.preview.states = new Map();
           }
 
-          state.ready = true;
+          state.preview.ready = true;
           tintAllLoadedModelsIfNeeded();
-          log('Arena character states loaded');
+          onResize();
+          log('Preview character loaded');
         },
         undefined,
         (error) => {
-          console.error('[Outra3D] Failed to load arena character GLB:', error);
+          console.error('[Outra3D] Failed to load preview character GLB:', error);
         }
       );
     }
+  }
 
     if (previewCfg.glb) {
       state.loader.load(
