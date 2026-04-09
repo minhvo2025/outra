@@ -146,22 +146,74 @@ function bindDesktopSpellTooltips() {
 // ── Tab Switching ─────────────────────────────────────────────
 function setMenuTab(tab) {
   activeMenuTab = tab;
-  document.querySelectorAll('[data-menu-tab]').forEach(btn =>
-    btn.classList.toggle('active', btn.dataset.menuTab === tab)
-  );
-  document.querySelectorAll('.menuPage').forEach(page => page.classList.remove('active'));
+
+  document.querySelectorAll('[data-menu-tab]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.menuTab === tab);
+  });
+
+  document.querySelectorAll('.menuPage').forEach((page) => {
+    page.classList.remove('active');
+  });
+
   const page = document.getElementById('menu' + tab.charAt(0).toUpperCase() + tab.slice(1));
   if (page) page.classList.add('active');
 }
 
+function openStoreModal() {
+  const modal = document.getElementById('storeModal');
+  if (!modal) return;
+
+  activeLobbyTab = 'store';
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('storeOpen');
+
+  document.querySelectorAll('[data-lobby-tab]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lobbyTab === 'store');
+  });
+
+  renderStore();
+  renderInventory();
+}
+
+function closeStoreModal() {
+  const modal = document.getElementById('storeModal');
+  if (!modal) return;
+
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('storeOpen');
+
+  activeLobbyTab = 'play';
+  document.querySelectorAll('[data-lobby-tab]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lobbyTab === 'play');
+  });
+}
+
 function setLobbyTab(tab) {
   activeLobbyTab = tab;
-  document.querySelectorAll('[data-lobby-tab]').forEach(btn =>
-    btn.classList.toggle('active', btn.dataset.lobbyTab === tab)
-  );
-  document.querySelectorAll('.lobbyPage').forEach(page => page.classList.remove('active'));
+
+  document.querySelectorAll('[data-lobby-tab]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lobbyTab === tab);
+  });
+
+  if (tab === 'store') {
+    openStoreModal();
+    return;
+  }
+
+  closeStoreModal();
+
+  document.querySelectorAll('.lobbyPage').forEach((page) => {
+    page.classList.remove('active');
+  });
+
   const page = document.getElementById('lobby' + tab.charAt(0).toUpperCase() + tab.slice(1));
   if (page) page.classList.add('active');
+
+  if (tab === 'play') {
+    drawLobbyPreview();
+  }
 }
 
 // ── Mobile Controls Visibility ────────────────────────────────
