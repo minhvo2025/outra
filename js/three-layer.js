@@ -1237,6 +1237,7 @@ function prepareDummyModel(root, mountGroup) {
     mixerState.currentState = nextName;
     applyArenaRotationForState(mixerState);
     showAnimationDebug(mixerState.states.get(nextName)?.clipName || nextName);
+  }
 
   function setArenaPlayerState(nextName, force = false) {
     crossFadeState(state.player, nextName, force);
