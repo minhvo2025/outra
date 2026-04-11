@@ -1823,8 +1823,8 @@ body.storeOpen {
 }
 
 .enterArenaBtn {
-  width: min(900px, 95%);
-  height: 180px; /* 🔥 CONTROL HEIGHT DIRECTLY */
+  width: min(800px, 95%);
+  height: 250px; /* 🔥 CONTROL HEIGHT DIRECTLY */
 
   padding: 0;
   border: 0;
@@ -1854,8 +1854,8 @@ body.storeOpen {
 
 .enterArenaText {
   display: inline-block;
-  font-size: clamp(28px, 2.4vw, 42px);
-  font-weight: 900;
+  font-size: clamp(20px, 2.4vw, 30px);
+  font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #fbf1dc;
