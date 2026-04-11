@@ -253,7 +253,7 @@ window.OUTRA_3D_CONFIG = {
   enabled: true,
 
   lobbyArt: {
-    bg: '/docs/art/Lobby/BG.jpeg',
+    bg: '/docs/art/Lobby/BG.png',
     button: '/docs/art/Lobby/Button.png',
     currency: '/docs/art/Lobby/Currency.png',
     frame: '/docs/art/Lobby/Frame.png',
