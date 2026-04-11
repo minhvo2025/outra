@@ -1823,15 +1823,15 @@ body.storeOpen {
 }
 
 .enterArenaBtn {
-  width: min(720px, 95%);   /* BIGGER overall size */
-  aspect-ratio: 5 / 1;      /* keeps your image proportions */
-  
+  width: min(900px, 95%);   /* make it BIG */
+  height: auto;
+
   padding: 0;
   border: 0;
   border-radius: 0;
 
-  background: url('/docs/art/Lobby/Button.png') center / contain no-repeat;
-  
+  background: url('/docs/art/Lobby/Button.png') center / 100% 100% no-repeat;
+
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1864,19 +1864,6 @@ body.storeOpen {
     0 0 14px rgba(255, 183, 84, 0.20);
   pointer-events: none;
 }
-
-.enterArenaText {
-  display: inline-block;
-  font-size: clamp(24px, 2vw, 34px);
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #fbf1dc;
-  text-shadow:
-    0 2px 0 rgba(0,0,0,0.76),
-    0 0 14px rgba(255, 183, 84, 0.14);
-}
-
 .rewardRow {
   display: flex;
   gap: 10px;
