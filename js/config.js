@@ -187,6 +187,22 @@ const storeItems = [
     description: 'Adventurer boots',
     apply: (p) => p.store.boots = true
   },
+  {
+    id: 'emoteGoodGame',
+    type: 'emote',
+    name: 'Emote: Good game',
+    cost: 5,
+    description: 'Unlocks the "Good game" emote in Draft Room.',
+    apply: (p) => p.store.emoteGoodGame = true
+  },
+  {
+    id: 'emoteEasyWin',
+    type: 'emote',
+    name: 'Emote: Easy Win',
+    cost: 5,
+    description: 'Unlocks the "Easy Win" emote in Draft Room.',
+    apply: (p) => p.store.emoteEasyWin = true
+  },
 ];
 
 // ── Keybinds ──────────────────────────────────────────────────
@@ -232,6 +248,7 @@ let selectedColorIndex = 0;
 let gameState = 'lobby';
 let menuOpen = false;
 let winnerText = '';
+let winnerReward = null;
 let resultTimer = 0;
 let lavaSoundTimer = 0;
 let musicMuted = false;
@@ -240,12 +257,57 @@ let activeLobbyTab = 'play';
 let dummyEnabled = false;
 let dummyBehavior = 'active'; // 'active' | 'standing'
 let hudVisible = false;
+const FORCE_ARENA_PERFORMANCE_MODE = true;
+
+const draftState = {
+  order: ['A', 'B', 'B', 'A', 'A', 'B'],
+  spellOrder: ['hook', 'blink', 'shield', 'charge', 'shock', 'gust', 'wall', 'rewind'],
+  localPlayerId: 'A',
+  turnDuration: 8,
+  holdDuration: 0.6,
+  autoStartDelay: 1,
+  completeAt: 0,
+  turnIndex: 0,
+  activeIndex: 0,
+  turnTimeLeft: 8,
+  elapsed: 0,
+  totalDuration: 48,
+  timeLeft: 8,
+  holdSpellId: null,
+  holdTime: 0,
+  complete: false,
+  pickFx: {
+    transfers: [],
+    ringPulses: [],
+    tileBursts: [],
+  },
+  turnFlash: null,
+  layout: null,
+  spells: [],
+  picks: {
+    A: [],
+    B: [],
+  },
+  players: {
+    A: { x: 0, y: 0, vx: 0, vy: 0, moveTimer: 0, dirX: 0, dirY: 0 },
+    B: { x: 0, y: 0, vx: 0, vy: 0, moveTimer: 0, dirX: 0, dirY: 0 },
+  },
+};
 
 const skillAimPreview = {
   active: false,
   type: null,
   dx: 1,
   dy: 0
+};
+
+const arenaIntro = {
+  active: false,
+  elapsed: 0,
+  preDelay: 1,
+  countdownSeconds: 3,
+  fightDuration: 0.9,
+  postFightDelay: 0.8,
 };
 
 // ── 3D Character Layer ───────────────────────────────────────
@@ -256,16 +318,16 @@ window.OUTRA_3D_CONFIG = {
     bg: '/docs/art/Lobby/BG.png',
     button: '/docs/art/Lobby/Button.png',
     currency: '/docs/art/Lobby/Currency.png',
-    frame: '/docs/art/Lobby/Frame.png',
     emberOrange: '/docs/art/Lobby/Orange.png',
     emberPurple: '/docs/art/Lobby/Purple.png',
     ranks: '/docs/art/Lobby/Ranks.png',
   },
 
   lobbyCharacter: {
-    glb: '/docs/art/Lobby/Outron_lobby.glb',
+    glb: '/docs/art/Lobby/player_lobby.glb',
     animations: {
-      idle: 'idle',
+      idle: 'Running',
+      hover: 'Idle_11',
     },
   },
 
@@ -323,6 +385,85 @@ stateRotationOffsets: {
     lockRotationZ: 0,
   },
 
+  draftRoom: {
+    enabled: false,
+    playerFloatAmplitude: 1.1,
+    playerFloatSpeed: 0.9,
+    character: {
+      glb: '',
+    },
+    frontView: {
+      enabled: true,
+      rotationX: Math.PI * 0.5,
+      rotationY: Math.PI,
+      rotationZ: 0,
+      scale: 3.675,
+    },
+    platform: {
+      enabled: false,
+      glb: '',
+      attachToPlayers: true,
+      playerDiameter: 84,
+      playerScale: 2,
+      playerFootClearance: 0.65,
+      playerLocalYOffset: -0.85,
+      playerFloatAmplitude: 0.2,
+      playerFloatSpeed: 0.95,
+      offsetX: 0,
+      offsetY: -6,
+      offsetZ: 0,
+      rotationX: -1.1,
+      rotationY: 0,
+      rotationZ: 0,
+      scale: 1,
+      fitToLayoutRadius: 1.95,
+      brightness: 1,
+      opacity: 1,
+    },
+    playerTilt: {
+      x: -0.12,
+      z: 0.04,
+    },
+    playerYawOffset: 0,
+    playerYOffset: 6,
+    playerIdleYOffset: 12,
+    playerSeatOffsets: {
+      A: { x: 0, y: -8 },
+      B: { x: 0, y: 8 },
+    },
+    layout: {
+      centerOffsetX: 0,
+      centerOffsetY: 0,
+      gridOffsetX: 0,
+      gridOffsetY: -18,
+      gridInsidePadding: 26,
+      tileGapX: 60,
+      tileGapY: 68,
+      sideSeatMode: true,
+      sideSeatXFactor: 0.18,
+      sideSeatYFactor: 0.24,
+      sideSeatUsePanelAnchors: true,
+      sideSeatPanelOffsetY: 28,
+      moveRadiusScale: 0.92,
+      moveRadiusPadding: -6,
+      seatRadiusScale: 0.62,
+      seatRadiusOffset: 0,
+    },
+    orb: {
+      height: 16,
+      bobAmplitude: 5.5,
+      bobSpeed: 1.35,
+      scale: 2,
+      glowIntensity: 1,
+      stateBrightness: {
+        idle: 1,
+        selectable: 1.14,
+        channeling: 1.36,
+        taken: 0.42,
+      },
+    },
+  },
+
   floorEnergyEnabled: true,
   floorEnergySpeedX: 0.0035,
   floorEnergySpeedY: 0.0055,
@@ -340,8 +481,8 @@ stateRotationOffsets: {
   modelYOffsetMobile: 14,
 
   previewCharacter: {
-    targetHeightDesktop: 112,
-    targetHeightMobile: 84,
+    targetHeightDesktop: 100,
+    targetHeightMobile: 78,
 
     cameraFovDesktop: 30,
     cameraFovMobile: 34,
@@ -349,14 +490,14 @@ stateRotationOffsets: {
     cameraYDesktop: 96,
     cameraYMobile: 68,
 
-    cameraZDesktop: 368,
+    cameraZDesktop: 378,
     cameraZMobile: 392,
 
-    lookAtYDesktop: 74,
-    lookAtYMobile: 54,
+    lookAtYDesktop: 68,
+    lookAtYMobile: 50,
 
-    modelYOffsetDesktop: -28,
-    modelYOffsetMobile: -20,
+    modelYOffsetDesktop: -14,
+    modelYOffsetMobile: -10,
 
     shadowScaleXDesktop: 1.8,
     shadowScaleXMobile: 1.55,
@@ -382,6 +523,7 @@ const profile = {
   musicMuted: false,
   musicVolume: 0.38,
   aimSensitivity: 0.7,
+  performanceMode: true,
   ranked: {
     mmr: 0,
     wins: 0,
@@ -397,7 +539,9 @@ const profile = {
     crown: false,
     strawHat: false,
     sweater: false,
-    boots: false
+    boots: false,
+    emoteGoodGame: false,
+    emoteEasyWin: false
   },
   equipped: {
     hat: null,
@@ -543,6 +687,7 @@ let ctx = bgCtx;
 const hud = document.getElementById('hud');
 const topbar = document.getElementById('topbar');
 const overlay = document.getElementById('overlay');
+const draftOverlay = document.getElementById('draftOverlay');
 const menuPanel = document.getElementById('menuPanel');
 
 const hpEl = document.getElementById('hp');
@@ -555,13 +700,21 @@ const playerNameHudEl = document.getElementById('playerNameHud');
 
 const hudToggleBtn = document.getElementById('hudToggleBtn');
 const menuBtn = document.getElementById('menuBtn');
+const draftTurnBadgeEl = document.getElementById('draftTurnBadge');
 const lobbyMenuBtn = document.getElementById('lobbyMenuBtn');
+const draftTurnTextEl = document.getElementById('draftTurnText');
+const draftCountdownEl = document.getElementById('draftCountdown');
+const draftTimerCardEl = document.getElementById('draftTimerCard');
+const draftOrderListEl = document.getElementById('draftOrderList');
+const draftOrderProgressEl = document.getElementById('draftOrderProgress');
+const draftHelperTextEl = document.getElementById('draftHelperText');
 
 const resumeBtn = document.getElementById('resumeBtn');
 const musicToggleBtn = document.getElementById('musicToggleBtn');
 const standingDummyBtn = document.getElementById('standingDummyBtn');
 const activeDummyBtn = document.getElementById('activeDummyBtn');
 const removeDummyBtn = document.getElementById('removeDummyBtn');
+const toArenaBtn = document.getElementById('toArenaBtn');
 const toLobbyBtn = document.getElementById('toLobbyBtn');
 const resetBtn = document.getElementById('resetBtn');
 const menuResetBindsBtn = document.getElementById('menuResetBindsBtn');
@@ -572,6 +725,7 @@ const aimSensitivitySlider = document.getElementById('aimSensitivitySlider');
 const aimSensitivityValue = document.getElementById('aimSensitivityValue');
 const musicVolumeSlider = document.getElementById('musicVolumeSlider');
 const musicVolumeValue = document.getElementById('musicVolumeValue');
+const performanceModeToggleBtn = document.getElementById('performanceModeToggleBtn');
 
 const nameInput = document.getElementById('nameInput');
 const colorRow = document.getElementById('colorRow');
@@ -582,8 +736,10 @@ const startBtn = document.getElementById('startBtn');
 
 const wlkLobbyEl = document.getElementById('wlkLobby');
 const wlkLobbyTopEl = document.getElementById('wlkLobbyTop');
+const wlkTopbarEl = document.getElementById('wlkTopbar');
 
 const previewCanvas = document.getElementById('previewCanvas');
+const lobbyHeroNameEl = document.getElementById('lobbyHeroName');
 const previewCtx = previewCanvas ? previewCanvas.getContext('2d') : null;
 
 // ── Mobile Controls ───────────────────────────────────────────

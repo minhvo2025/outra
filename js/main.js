@@ -20,6 +20,10 @@ if (window.outraThree && window.outraThree.init) {
   window.outraThree.init();
 }
 
+if (typeof initCustomMouseCursor === 'function') {
+  initCustomMouseCursor();
+}
+
 loadProfile();
 applyPlayerColors();
 resizeCanvas();
@@ -34,6 +38,7 @@ player.score = getPlayerPoints(player.name);
 renderLeaderboard();
 updateAimSensitivityUI();
 updateMusicVolumeUI();
+updatePerformanceModeUI();
 setMusicMuted(musicMuted);
 drawLobbyPreview();
 updateHud();

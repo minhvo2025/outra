@@ -95,8 +95,108 @@
   </div>
 
   <div id="topbar">
-    <button id="hudToggleBtn" class="secondary">Hide Info</button>
     <button id="menuBtn" class="secondary">Menu</button>
+    <div id="topbarCurrency" class="topCurrencyCard topCurrencyCardCompact" aria-label="Currency">
+      <img src="docs/art/Lobby/Currency.png" alt="" class="currencyIcon topbarCurrencyIcon" />
+      <span id="wlkTopbar">0</span>
+    </div>
+  </div>
+
+  <div id="draftOverlay" aria-hidden="true">
+    <div class="draftHudTop">
+      <div class="draftPhaseTitle">DRAFT PHASE</div>
+      <div id="draftTurnText" class="draftTurnText">TURN 1 - PICK A SPELL</div>
+      <div class="draftTimerCard" id="draftTimerCard">
+        <div class="draftTimerLabel">Timer</div>
+        <div id="draftCountdown" class="draftCountdown">36</div>
+      </div>
+    </div>
+    <div id="draftTurnBadge" class="draftTurnBadge">PLAYER A TURN</div>
+
+    <div class="draftPlayerRail draftPlayerRailLeft">
+      <div class="draftPlayerPanel" data-draft-player-panel="A">
+        <div class="draftPlayerHeader">
+          <div class="draftPlayerAvatarWrap" data-draft-player-avatar-wrap="A">
+            <img
+              class="draftPlayerAvatarImg"
+              data-draft-player-avatar="A"
+              src="/docs/art/pfp.png"
+              alt="Player A avatar"
+              loading="lazy"
+              decoding="async"
+              draggable="false"
+            />
+            <span class="draftPlayerAvatarFallback">A</span>
+          </div>
+          <div class="draftPlayerMetaBlock">
+            <div class="draftPlayerMetaTop">
+              <span class="draftPlayerId">A</span>
+              <span class="draftPlayerMeta" data-draft-player-meta="A">Player A</span>
+            </div>
+            <span class="draftPlayerState" data-draft-player-state="A">WAITING</span>
+          </div>
+          <div class="draftPlayerRankWrap" data-draft-player-rank="A" aria-label="Player A rank"></div>
+        </div>
+        <div class="draftPickSlots">
+          <div class="draftPickSlot empty" data-draft-player-slot="A-0"><span class="draftPickPlaceholder">Empty</span></div>
+          <div class="draftPickSlot empty" data-draft-player-slot="A-1"><span class="draftPickPlaceholder">Empty</span></div>
+          <div class="draftPickSlot empty" data-draft-player-slot="A-2"><span class="draftPickPlaceholder">Empty</span></div>
+        </div>
+      </div>
+      <div class="draftEmoteStrip" data-draft-emote-strip="A" aria-label="Player A emotes">
+        <button class="draftEmoteBtn" type="button" data-draft-emote-btn="A:greetings">Greetings</button>
+        <button class="draftEmoteBtn" type="button" data-draft-emote-btn="A:good_game">Good game</button>
+        <button class="draftEmoteBtn" type="button" data-draft-emote-btn="A:easy_win">Easy Win</button>
+      </div>
+      <div class="draftEmoteToast" data-draft-emote-toast="A" aria-live="polite"></div>
+    </div>
+
+    <div class="draftPlayerRail draftPlayerRailRight">
+      <div class="draftPlayerPanel" data-draft-player-panel="B">
+        <div class="draftPlayerHeader">
+          <div class="draftPlayerAvatarWrap" data-draft-player-avatar-wrap="B">
+            <img
+              class="draftPlayerAvatarImg"
+              data-draft-player-avatar="B"
+              src="/docs/art/pfp.png"
+              alt="Player B avatar"
+              loading="lazy"
+              decoding="async"
+              draggable="false"
+            />
+            <span class="draftPlayerAvatarFallback">B</span>
+          </div>
+          <div class="draftPlayerMetaBlock">
+            <div class="draftPlayerMetaTop">
+              <span class="draftPlayerId">B</span>
+              <span class="draftPlayerMeta" data-draft-player-meta="B">Player B</span>
+            </div>
+            <span class="draftPlayerState" data-draft-player-state="B">WAITING</span>
+          </div>
+          <div class="draftPlayerRankWrap" data-draft-player-rank="B" aria-label="Player B rank"></div>
+        </div>
+        <div class="draftPickSlots">
+          <div class="draftPickSlot empty" data-draft-player-slot="B-0"><span class="draftPickPlaceholder">Empty</span></div>
+          <div class="draftPickSlot empty" data-draft-player-slot="B-1"><span class="draftPickPlaceholder">Empty</span></div>
+          <div class="draftPickSlot empty" data-draft-player-slot="B-2"><span class="draftPickPlaceholder">Empty</span></div>
+        </div>
+      </div>
+      <div class="draftEmoteStrip" data-draft-emote-strip="B" aria-label="Player B emotes">
+        <button class="draftEmoteBtn" type="button" data-draft-emote-btn="B:greetings">Greetings</button>
+        <button class="draftEmoteBtn" type="button" data-draft-emote-btn="B:good_game">Good game</button>
+        <button class="draftEmoteBtn" type="button" data-draft-emote-btn="B:easy_win">Easy Win</button>
+      </div>
+      <div class="draftEmoteToast" data-draft-emote-toast="B" aria-live="polite"></div>
+    </div>
+
+    <div class="draftOrderDock">
+      <div class="draftOrderHead">
+        <div class="draftOrderLabel">Draft Order</div>
+        <div id="draftOrderProgress" class="draftOrderProgress">Pick 1/6</div>
+      </div>
+      <div id="draftOrderList" class="draftOrderList"></div>
+      <div id="draftHelperText" class="draftHelperText">Choose your spell</div>
+    </div>
   </div>
 
   <div id="mobileControls">
@@ -213,14 +313,14 @@
           <span class="menuBtnLabel">Remove Dummy</span>
         </button>
 
-        <button id="toLobbyBtn" class="secondary menuActionBtn dangerBtn">
-          <span class="menuBtnBadge">⛧</span>
-          <span class="menuBtnLabel">Go to Lobby</span>
+        <button id="toArenaBtn" class="secondary menuActionBtn">
+          <span class="menuBtnBadge">&gt;</span>
+          <span class="menuBtnLabel">Practice</span>
         </button>
 
-        <button id="resetBtn" class="secondary menuActionBtn dangerBtn">
-          <span class="menuBtnBadge">☠</span>
-          <span class="menuBtnLabel">Reset Round</span>
+        <button id="toLobbyBtn" class="secondary menuActionBtn dangerBtn">
+          <span class="menuBtnBadge">⛧</span>
+          <span class="menuBtnLabel">Exit to Lobby</span>
         </button>
       </div>
     </div>
@@ -263,6 +363,12 @@
     />
     <span id="musicVolumeValue" class="tag">38%</span>
   </div>
+
+  <div class="sectionTitle" style="font-size:16px;">Arena Performance</div>
+  <div class="hint">Reduces lava and particle detail for smoother battles.</div>
+  <div class="row" style="margin-top:10px; align-items:center;">
+    <button id="performanceModeToggleBtn" class="secondary" type="button">Performance Mode: On (Forced)</button>
+  </div>
 </div>
     </div>
 
@@ -275,7 +381,6 @@
   </div>
 
   <div class="lobbyBrandWrap">
-    <div class="lobbyBrandEyebrow">Arcane Arena</div>
     <div class="lobbyBrand">Outra Lobby</div>
   </div>
 
@@ -296,8 +401,7 @@
             <div class="sectionTitle">Your Rankings</div>
             <div id="colorRow" class="colorRowAaa"></div>
 
-            <div class="sectionTitle">Inventory</div>
-            <div id="inventoryList" class="inventoryGrid"></div>
+            <div id="inventoryList"></div>
           </div>
         </aside>
 
@@ -307,8 +411,7 @@
 
             <div class="heroStageHeader immersiveStageHeader">
               <div>
-                <div class="heroOverline">Arcane Chamber</div>
-                <div class="heroTitle">Outron</div>
+                <div id="lobbyHeroName" class="heroTitle">Player</div>
               </div>
             </div>
 
@@ -360,10 +463,13 @@
           <div class="heroOverline">Arcane Market</div>
           <div class="heroTitle storeModalTitle">Store</div>
         </div>
-        <div id="wlkLobby" class="storeCurrencyLine">WLK Points: 0</div>
+        <div id="wlkLobby" class="storeCurrencyLine" aria-label="Currency">
+          <img src="docs/art/Lobby/Currency.png" alt="" class="currencyIcon storeCurrencyIcon" />
+          <span class="storeCurrencyValue">0</span>
+        </div>
       </div>
 
-      <div class="hint storeHint">Buy cosmetics and upgrades with WLK.</div>
+      <div class="hint storeHint">Buy cosmetics and upgrades with your currency.</div>
       <div id="storeList" class="storeModalList"></div>
     </div>
   </div>
@@ -371,6 +477,7 @@
 
   <!-- Scripts: config first, main last -->
   <script src="js/config.js"></script>
+  <script src="js/rank-config.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/vendor/three.min.js"></script>
   <script src="js/vendor/GLTFLoader.js"></script>

@@ -303,7 +303,7 @@ window.addEventListener('keydown', (e) => {
     castPlayerSpell('rewind');
   }
 
-  if (gameState !== 'lobby' && norm === keybinds.reset) resetRound();
+  if ((gameState === 'playing' || gameState === 'result') && norm === keybinds.reset) resetRound();
 
   if (norm === keybinds.menu) {
     e.preventDefault();
@@ -349,6 +349,15 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
+
+  if (gameState === 'draft' && e.button === 0) {
+    tryDraftPickAtCursor();
+    return;
+  }
+
   if (gameState !== 'playing') return;
   startMusicIfNeeded();
 
@@ -378,6 +387,7 @@ canvas.addEventListener('touchmove', (e) => {
 function openMenu() {
   menuOpen = true;
   menuPanel.style.display = 'block';
+  setCanvasCursorMode('menu');
 
   requestAnimationFrame(() => {
     menuPanel.classList.add('open');
@@ -391,6 +401,9 @@ function closeMenu() {
   menuOpen = false;
   menuPanel.classList.remove('open');
   document.body.classList.remove('menuVisible');
+  if (gameState === 'playing') setCanvasCursorMode('crosshair');
+  else if (gameState === 'draft') setCanvasCursorMode('pointer');
+  else setCanvasCursorMode('default');
 
   setTimeout(() => {
     if (!menuOpen) menuPanel.style.display = 'none';
@@ -400,6 +413,10 @@ function closeMenu() {
 function toggleMenu() {
   if (menuOpen) closeMenu();
   else openMenu();
+}
+
+function playMenuClickSound() {
+  // Menu clicks are intentionally silent.
 }
 
 document.addEventListener('pointerdown', (e) => {
@@ -417,16 +434,26 @@ document.addEventListener('pointerdown', (e) => {
 });
 
 // ── UI Button Events ──────────────────────────────────────────
-hudToggleBtn.addEventListener('click', () => {
-  hudVisible = !hudVisible;
-  updateHud();
+if (hudToggleBtn) {
+  hudToggleBtn.addEventListener('click', () => {
+    hudVisible = !hudVisible;
+    updateHud();
+  });
+}
+
+menuBtn.addEventListener('click', () => {
+  playMenuClickSound();
+  toggleMenu();
 });
 
-menuBtn.addEventListener('click', toggleMenu);
-lobbyMenuBtn.addEventListener('click', toggleMenu);
+lobbyMenuBtn.addEventListener('click', () => {
+  playMenuClickSound();
+  toggleMenu();
+});
 
 document.querySelectorAll('[data-menu-tab]').forEach((btn) => {
   btn.addEventListener('click', () => {
+    playMenuClickSound();
     setMenuTab(btn.dataset.menuTab);
   });
 });
@@ -460,41 +487,60 @@ window.addEventListener('keydown', (e) => {
 });
 
 resumeBtn.addEventListener('click', () => {
+  playMenuClickSound();
   closeMenu();
 });
 
+toArenaBtn.addEventListener('click', () => {
+  playMenuClickSound();
+  closeMenu();
+  if (gameState === 'draft') {
+    gameState = 'lobby';
+  }
+  startMatch({ skipArenaIntro: true });
+});
+
 toLobbyBtn.addEventListener('click', () => {
+  playMenuClickSound();
   closeMenu();
   enterLobby();
 });
 
-resetBtn.addEventListener('click', () => {
-  resetRound();
-  closeMenu();
-});
+if (resetBtn) {
+  resetBtn.addEventListener('click', () => {
+    playMenuClickSound();
+    resetRound();
+    closeMenu();
+  });
+}
 
 musicToggleBtn.addEventListener('click', () => {
+  playMenuClickSound();
   startMusicIfNeeded();
   setMusicMuted(!musicMuted);
   updateHud();
 });
 
 standingDummyBtn.addEventListener('click', () => {
+  playMenuClickSound();
   spawnDummy('standing');
   updateHud();
 });
 
 activeDummyBtn.addEventListener('click', () => {
+  playMenuClickSound();
   spawnDummy('active');
   updateHud();
 });
 
 removeDummyBtn.addEventListener('click', () => {
+  playMenuClickSound();
   removeDummy();
   updateHud();
 });
 
 menuResetBindsBtn.addEventListener('click', () => {
+  playMenuClickSound();
   keybinds = { ...defaultBinds };
   waitingForBind = null;
   buildKeybindsUI();
@@ -518,9 +564,49 @@ if (musicVolumeSlider) {
   });
 }
 
+if (performanceModeToggleBtn) {
+  performanceModeToggleBtn.addEventListener('click', () => {
+    if (typeof FORCE_ARENA_PERFORMANCE_MODE !== 'undefined' && FORCE_ARENA_PERFORMANCE_MODE) {
+      updatePerformanceModeUI();
+      return;
+    }
+    profile.performanceMode = !profile.performanceMode;
+    updatePerformanceModeUI();
+    saveProfile();
+    updateHud();
+  });
+}
+
 startBtn.addEventListener('click', (e) => {
   e.preventDefault();
-  startMatch();
+  enterDraftRoom();
+});
+
+function setArenaHoverAura(active) {
+  if (window.outraThree && typeof window.outraThree.setPreviewAuraActive === 'function') {
+    window.outraThree.setPreviewAuraActive(active);
+  }
+
+  const previewViewport = document.getElementById('previewViewport');
+  if (previewViewport) {
+    previewViewport.classList.toggle('arenaAuraActive', !!active);
+  }
+}
+
+startBtn.addEventListener('pointerenter', () => {
+  setArenaHoverAura(true);
+});
+
+startBtn.addEventListener('pointerleave', () => {
+  setArenaHoverAura(false);
+});
+
+startBtn.addEventListener('focus', () => {
+  setArenaHoverAura(true);
+});
+
+startBtn.addEventListener('blur', () => {
+  setArenaHoverAura(false);
 });
 
 nameInput.addEventListener('input', () => {
@@ -531,7 +617,7 @@ nameInput.addEventListener('input', () => {
 nameInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
-    startMatch();
+    enterDraftRoom();
   }
 });
 

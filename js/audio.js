@@ -171,7 +171,143 @@ function playTone(type, frequency, duration, volume, frequencyEnd = null, output
 }
 
 // ── Sound Effects ─────────────────────────────────────────────
-const soundFire      = () => playTone('sawtooth', 320, 0.12, 0.050, 120);
+const SOUND_FX_SOURCES = {
+  click: '/docs/Music/Soundfx/click.MP3',
+  fireball: '/docs/Music/Soundfx/fireball.MP3',
+  shield: '/docs/Music/Soundfx/shield.MP3',
+  charge: '/docs/Music/Soundfx/charge.MP3',
+  hover_spell: '/docs/Music/Soundfx/hover_spell.MP3',
+  pick: '/docs/Music/Soundfx/pick.MP3',
+};
+
+const soundFxBufferCache = new Map();
+const soundFxLoadCache = new Map();
+
+function decodeAudioBuffer(arrayBuffer) {
+  return new Promise((resolve, reject) => {
+    audioCtx.decodeAudioData(arrayBuffer, resolve, reject);
+  });
+}
+
+function loadSoundFxBuffer(key) {
+  if (soundFxBufferCache.has(key)) {
+    return Promise.resolve(soundFxBufferCache.get(key));
+  }
+  if (soundFxLoadCache.has(key)) {
+    return soundFxLoadCache.get(key);
+  }
+
+  const src = SOUND_FX_SOURCES[key];
+  if (!src) return Promise.resolve(null);
+
+  const loadPromise = fetch(src)
+    .then((response) => {
+      if (!response.ok) throw new Error(`Failed to load ${src}`);
+      return response.arrayBuffer();
+    })
+    .then((bytes) => decodeAudioBuffer(bytes))
+    .then((buffer) => {
+      soundFxBufferCache.set(key, buffer);
+      return buffer;
+    })
+    .catch(() => null)
+    .finally(() => {
+      soundFxLoadCache.delete(key);
+    });
+
+  soundFxLoadCache.set(key, loadPromise);
+  return loadPromise;
+}
+
+function playSoundFx(key, volume = 1, playbackRate = 1) {
+  ensureAudioReady();
+
+  const buffer = soundFxBufferCache.get(key);
+  if (!buffer) {
+    loadSoundFxBuffer(key);
+    return false;
+  }
+
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.playbackRate.value = Math.max(0.25, Number(playbackRate) || 1);
+
+  const gain = audioCtx.createGain();
+  gain.gain.value = Math.max(0, Math.min(2, Number(volume) || 1));
+
+  source.connect(gain);
+  gain.connect(audioCtx.destination);
+  source.start();
+  return true;
+}
+
+const draftHoverSpellFx = {
+  requested: false,
+  source: null,
+  gain: null,
+};
+
+function startDraftSpellHoverSound() {
+  ensureAudioReady();
+  draftHoverSpellFx.requested = true;
+
+  if (draftHoverSpellFx.source) return true;
+
+  const playFromBuffer = (buffer) => {
+    if (!buffer) return false;
+    if (!draftHoverSpellFx.requested || draftHoverSpellFx.source) return false;
+
+    const source = audioCtx.createBufferSource();
+    const gain = audioCtx.createGain();
+
+    source.buffer = buffer;
+    source.loop = true;
+    gain.gain.value = 0.58;
+
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    source.onended = () => {
+      if (draftHoverSpellFx.source === source) {
+        draftHoverSpellFx.source = null;
+        draftHoverSpellFx.gain = null;
+      }
+    };
+
+    draftHoverSpellFx.source = source;
+    draftHoverSpellFx.gain = gain;
+    source.start();
+    return true;
+  };
+
+  const buffer = soundFxBufferCache.get('hover_spell');
+  if (buffer) return playFromBuffer(buffer);
+
+  loadSoundFxBuffer('hover_spell').then((loadedBuffer) => {
+    playFromBuffer(loadedBuffer);
+  });
+  return false;
+}
+
+function stopDraftSpellHoverSound() {
+  draftHoverSpellFx.requested = false;
+
+  const source = draftHoverSpellFx.source;
+  draftHoverSpellFx.source = null;
+  draftHoverSpellFx.gain = null;
+  if (!source) return;
+
+  try {
+    source.stop();
+  } catch {}
+}
+
+Object.keys(SOUND_FX_SOURCES).forEach((key) => {
+  loadSoundFxBuffer(key);
+});
+
+const soundClick     = () => playSoundFx('click', 0.82) || playTone('triangle', 560, 0.05, 0.02, 420);
+const soundFire      = () => playSoundFx('fireball', 0.96) || playTone('sawtooth', 320, 0.12, 0.050, 120);
 const soundHook      = () => playTone('square',   180, 0.12, 0.035, 320);
 const soundTeleport  = () => playTone('triangle', 220, 0.18, 0.060, 660);
 const soundHit       = () => playTone('square',   260, 0.08, 0.045, 140);
@@ -181,13 +317,15 @@ const soundLose      = () => playTone('sawtooth', 180, 0.20, 0.050,  70);
 const soundHeal      = () => playTone('triangle', 520, 0.16, 0.040, 760);
 const soundShock     = () => playTone('square',   240, 0.12, 0.050,  80);
 const soundGust      = () => playTone('triangle', 540, 0.11, 0.032, 180);
+const soundShield    = () => playSoundFx('shield', 0.95) || playTone('triangle', 460, 0.14, 0.045, 260);
 
 const soundWall = () => {
   playTone('sawtooth', 150, 0.16, 0.032, 110);
   playTone('triangle', 220, 0.22, 0.024, 320);
 };
 
-const soundCharge = () => playTone('sawtooth', 180, 0.16, 0.050, 540);
+const soundCharge = () => playSoundFx('charge', 0.95) || playTone('sawtooth', 180, 0.16, 0.050, 540);
+const soundDraftPick = () => playSoundFx('pick', 0.92) || playTone('triangle', 620, 0.08, 0.028, 340);
 
 const soundChargeHit = () => {
   playTone('square',   210, 0.09, 0.050, 120);
