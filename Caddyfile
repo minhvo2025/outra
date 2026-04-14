@@ -5,7 +5,7 @@
 	handle @runtimeConfig {
 		header Content-Type "application/javascript; charset=utf-8"
 		header Cache-Control "no-store"
-		respond "window.__OUTRA_MULTIPLAYER_URL__ = \"{$OUTRA_MULTIPLAYER_SERVER_URL}\";"
+		respond "window.__OUTRA_MULTIPLAYER_URL__ = \"{env.OUTRA_MULTIPLAYER_SERVER_URL}\" || \"{env.OUTRA_MULTIPLAYER_URL}\";"
 	}
 
 	file_server
