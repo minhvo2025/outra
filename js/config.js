@@ -288,6 +288,11 @@ const draftState = {
     A: [],
     B: [],
   },
+  playerNames: {
+    A: '',
+    B: '',
+  },
+  spellPool: {},
   players: {
     A: { x: 0, y: 0, vx: 0, vy: 0, moveTimer: 0, dirX: 0, dirY: 0 },
     B: { x: 0, y: 0, vx: 0, vy: 0, moveTimer: 0, dirX: 0, dirY: 0 },
@@ -657,6 +662,13 @@ const dummy = {
   aiMoveTimer: 0,
   targetX: 0,
   targetY: 0,
+
+  aimX: -1,
+  aimY: 0,
+  shieldUntil: 0,
+  chargeActive: false,
+  chargeDirX: -1,
+  chargeDirY: 0,
 };
 
 // ── World Collections ─────────────────────────────────────────
@@ -669,6 +681,34 @@ const hooks = [];
 const potions = [];
 const rewindHistory = [];
 let rewindLastSampleAt = 0;
+const combatFx = {
+  shake: {
+    x: 0,
+    y: 0,
+    intensity: 0,
+    duration: 0,
+    timeLeft: 0,
+    elapsed: 0,
+  },
+  impactWaves: [],
+  directionalWaves: [],
+  actorHitFlash: {
+    player: 0,
+    dummy: 0,
+  },
+  eliminationPulse: {
+    x: 0,
+    y: 0,
+    life: 0,
+    maxLife: 0,
+    winnerPlayerNumber: null,
+    eliminatedPlayerNumber: null,
+  },
+  trailEmit: {
+    player: 0,
+    dummy: 0,
+  },
+};
 
 // ── Misc Timers ───────────────────────────────────────────────
 let lastTime = performance.now();
@@ -705,6 +745,8 @@ const lobbyMenuBtn = document.getElementById('lobbyMenuBtn');
 const draftTurnTextEl = document.getElementById('draftTurnText');
 const draftCountdownEl = document.getElementById('draftCountdown');
 const draftTimerCardEl = document.getElementById('draftTimerCard');
+const draftSpellPoolDockEl = document.getElementById('draftSpellPoolDock');
+const draftSpellPoolGridEl = document.getElementById('draftSpellPoolGrid');
 const draftOrderListEl = document.getElementById('draftOrderList');
 const draftOrderProgressEl = document.getElementById('draftOrderProgress');
 const draftHelperTextEl = document.getElementById('draftHelperText');
@@ -733,6 +775,9 @@ const inventoryList = document.getElementById('inventoryList');
 const leaderboardList = document.getElementById('leaderboardList');
 const storeList = document.getElementById('storeList');
 const startBtn = document.getElementById('startBtn');
+const draftRoomBtn = document.getElementById('draftRoomBtn');
+const quickMatchStateText = document.getElementById('quickMatchStateText');
+const cancelQueueBtn = document.getElementById('cancelQueueBtn');
 
 const wlkLobbyEl = document.getElementById('wlkLobby');
 const wlkLobbyTopEl = document.getElementById('wlkLobbyTop');

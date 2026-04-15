@@ -353,7 +353,11 @@ canvas.addEventListener('mousedown', (e) => {
   mouse.x = e.clientX - rect.left;
   mouse.y = e.clientY - rect.top;
 
-  if (gameState === 'draft' && e.button === 0) {
+  const mpSnapshot = (window.outraMultiplayer && typeof window.outraMultiplayer.getPresentationSnapshot === 'function')
+    ? window.outraMultiplayer.getPresentationSnapshot()
+    : null;
+  const multiplayerDraftActive = !!(mpSnapshot && mpSnapshot.active && mpSnapshot.isDraftActive);
+  if ((gameState === 'draft' || multiplayerDraftActive) && e.button === 0) {
     tryDraftPickAtCursor();
     return;
   }
@@ -577,10 +581,112 @@ if (performanceModeToggleBtn) {
   });
 }
 
-startBtn.addEventListener('click', (e) => {
-  e.preventDefault();
-  enterDraftRoom();
+function getQuickMatchApi() {
+  return window.outraMultiplayer || null;
+}
+
+function resolveQuickMatchSnapshot(explicitSnapshot = null) {
+  if (explicitSnapshot && typeof explicitSnapshot === 'object') {
+    return explicitSnapshot;
+  }
+  const api = getQuickMatchApi();
+  if (!api || typeof api.getQuickMatchState !== 'function') return null;
+  return api.getQuickMatchState();
+}
+
+function refreshLobbyQuickMatchUi(explicitSnapshot = null) {
+  const snapshot = resolveQuickMatchSnapshot(explicitSnapshot);
+  const status = String(snapshot?.status || 'idle').trim().toLowerCase();
+  const isSearching = status === 'searching';
+  const isMatched = status === 'matched';
+  const isLobbyState = gameState === 'lobby';
+
+  if (startBtn) {
+    startBtn.disabled = isLobbyState && isSearching;
+    startBtn.classList.toggle('isSearching', isSearching);
+  }
+
+  if (cancelQueueBtn) {
+    cancelQueueBtn.hidden = !isLobbyState || !isSearching;
+    cancelQueueBtn.disabled = !isLobbyState || !isSearching;
+  }
+
+  if (!quickMatchStateText) return;
+  if (!isLobbyState) {
+    quickMatchStateText.textContent = '';
+    return;
+  }
+
+  if (isSearching) {
+    const queueDepth = Math.max(0, Number(snapshot?.queueDepth) || 0);
+    quickMatchStateText.textContent = queueDepth > 1
+      ? `Finding Opponent... (${queueDepth} in queue)`
+      : 'Finding Opponent...';
+    return;
+  }
+
+  if (isMatched) {
+    quickMatchStateText.textContent = 'Opponent found. Entering Draft Room...';
+    return;
+  }
+
+  quickMatchStateText.textContent = '';
+}
+
+function queueQuickMatchFromLobby() {
+  const api = getQuickMatchApi();
+  if (!api || typeof api.queueQuickMatch !== 'function') {
+    if (quickMatchStateText) {
+      quickMatchStateText.textContent = 'Multiplayer unavailable.';
+    }
+    return;
+  }
+  const queued = api.queueQuickMatch();
+  if (queued !== false) {
+    refreshLobbyQuickMatchUi({ status: 'searching' });
+  }
+}
+
+if (startBtn) {
+  startBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    playMenuClickSound();
+    queueQuickMatchFromLobby();
+  });
+}
+
+if (draftRoomBtn) {
+  draftRoomBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    playMenuClickSound();
+    if (menuOpen) closeMenu();
+    const api = getQuickMatchApi();
+    if (api && typeof api.cancelQuickMatch === 'function') {
+      api.cancelQuickMatch();
+    }
+    enterDraftRoom();
+  });
+}
+
+if (cancelQueueBtn) {
+  cancelQueueBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    playMenuClickSound();
+    const api = getQuickMatchApi();
+    if (api && typeof api.cancelQuickMatch === 'function') {
+      const canceled = api.cancelQuickMatch();
+      if (canceled === false) return;
+    }
+    refreshLobbyQuickMatchUi({ status: 'idle' });
+  });
+}
+
+window.addEventListener('outra:quickmatch-state', (event) => {
+  refreshLobbyQuickMatchUi(event?.detail || null);
 });
+window.setTimeout(() => {
+  refreshLobbyQuickMatchUi();
+}, 0);
 
 function setArenaHoverAura(active) {
   if (window.outraThree && typeof window.outraThree.setPreviewAuraActive === 'function') {
@@ -593,21 +699,23 @@ function setArenaHoverAura(active) {
   }
 }
 
-startBtn.addEventListener('pointerenter', () => {
-  setArenaHoverAura(true);
-});
+function bindArenaHoverAura(buttonEl) {
+  if (!buttonEl) return;
+  buttonEl.addEventListener('pointerenter', () => {
+    setArenaHoverAura(true);
+  });
+  buttonEl.addEventListener('pointerleave', () => {
+    setArenaHoverAura(false);
+  });
+  buttonEl.addEventListener('focus', () => {
+    setArenaHoverAura(true);
+  });
+  buttonEl.addEventListener('blur', () => {
+    setArenaHoverAura(false);
+  });
+}
 
-startBtn.addEventListener('pointerleave', () => {
-  setArenaHoverAura(false);
-});
-
-startBtn.addEventListener('focus', () => {
-  setArenaHoverAura(true);
-});
-
-startBtn.addEventListener('blur', () => {
-  setArenaHoverAura(false);
-});
+bindArenaHoverAura(startBtn);
 
 nameInput.addEventListener('input', () => {
   player.name = (nameInput.value || 'Player').trim().slice(0, 16) || 'Player';
@@ -617,7 +725,7 @@ nameInput.addEventListener('input', () => {
 nameInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
-    enterDraftRoom();
+    queueQuickMatchFromLobby();
   }
 });
 

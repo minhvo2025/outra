@@ -112,7 +112,6 @@
       </div>
     </div>
     <div id="draftTurnBadge" class="draftTurnBadge">PLAYER A TURN</div>
-
     <div class="draftPlayerRail draftPlayerRailLeft">
       <div class="draftPlayerPanel" data-draft-player-panel="A">
         <div class="draftPlayerHeader">
@@ -318,6 +317,11 @@
           <span class="menuBtnLabel">Practice</span>
         </button>
 
+        <button id="draftRoomBtn" class="secondary menuActionBtn">
+          <span class="menuBtnBadge">◇</span>
+          <span class="menuBtnLabel">Draft Room</span>
+        </button>
+
         <button id="toLobbyBtn" class="secondary menuActionBtn dangerBtn">
           <span class="menuBtnBadge">⛧</span>
           <span class="menuBtnLabel">Exit to Lobby</span>
@@ -432,9 +436,13 @@
           </div>
 
           <div class="ctaWrap">
-            <button id="startBtn" class="enterArenaBtn">
-              <span class="enterArenaText">Enter Arena</span>
-            </button>
+            <div class="ctaButtons">
+              <button id="startBtn" class="enterArenaBtn" type="button">
+                <span class="enterArenaText">Enter Arena</span>
+              </button>
+            </div>
+            <div id="quickMatchStateText" class="quickMatchStateText" aria-live="polite"></div>
+            <button id="cancelQueueBtn" class="quickMatchCancelBtn" type="button" hidden>Cancel</button>
 
             <div class="rewardRow">
 

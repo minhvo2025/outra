@@ -14,6 +14,7 @@
     arenaFloorReady: false,
     activeCharacterSet: null,
     characterLoadToken: 0,
+    lastArenaRecoveryAt: 0,
     debugAnim: {
       text: '',
       timer: 0,
@@ -34,6 +35,15 @@
       active: false,
       refreshTime: 0,
       releaseTimeLeft: 0,
+    },
+    cameraShake: {
+      basePosition: null,
+      baseTarget: null,
+      intensity: 0,
+      duration: 0,
+      timeLeft: 0,
+      elapsed: 0,
+      phase: 0,
     },
     preview: {
       host: null,
@@ -148,6 +158,8 @@ lastWorldZ: null,
   const HIT_FLASH_DURATION_SEC = 0.11;
   const HIT_FLASH_BASE_SCALE = 34;
   const HIT_FLASH_HEIGHT_OFFSET = 46;
+  const CAMERA_SHAKE_MAX_WORLD_OFFSET = 15;
+  const CAMERA_SHAKE_MAX_DURATION = 0.28;
   const CHARGE_AFTERIMAGE_CONFIG = {
     ghostCount: 3,
     spacingPlayerLengths: [0.10, 0.22, 0.34],
@@ -484,10 +496,28 @@ function applyArenaRotationForState(mixerState) {
   }
 
   function isArenaPhase() {
+    const multiplayerApi = window.outraMultiplayer;
+    if (multiplayerApi && typeof multiplayerApi.getPresentationSnapshot === 'function') {
+      const snapshot = multiplayerApi.getPresentationSnapshot();
+      if (snapshot && snapshot.active) {
+        // Arena must win if both flags are true (stale draft status can linger).
+        if (snapshot.isArenaActive) return true;
+        if (snapshot.isDraftActive) return false;
+      }
+    }
     return gameState === 'playing' || gameState === 'result';
   }
 
   function isDraftPhase() {
+    const multiplayerApi = window.outraMultiplayer;
+    if (multiplayerApi && typeof multiplayerApi.getPresentationSnapshot === 'function') {
+      const snapshot = multiplayerApi.getPresentationSnapshot();
+      if (snapshot && snapshot.active) {
+        // Arena must win if both flags are true (stale draft status can linger).
+        if (snapshot.isArenaActive) return false;
+        if (snapshot.isDraftActive) return true;
+      }
+    }
     return gameState === 'draft';
   }
 
@@ -743,6 +773,16 @@ function applyArenaRotationForState(mixerState) {
     mat.needsUpdate = true;
   }
 
+  function enforceArenaOpaqueMaterial(mat) {
+    if (!mat) return;
+    if ('opacity' in mat) mat.opacity = 1;
+    if ('transparent' in mat) mat.transparent = false;
+    if ('depthWrite' in mat) mat.depthWrite = true;
+    if ('depthTest' in mat) mat.depthTest = true;
+    if ('alphaTest' in mat) mat.alphaTest = 0;
+    mat.needsUpdate = true;
+  }
+
   function stylizeModel(root) {
     traverseMeshes(root, (obj) => {
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
@@ -974,6 +1014,11 @@ function prepareArenaModelTransform(root, mountGroup, targetHeightOverride) {
   });
 
   stylizeModel(root);
+  // Keep arena avatars fully readable and prevent semi-transparent/ghost artifacts.
+  traverseMeshes(root, (obj) => {
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    mats.forEach(enforceArenaOpaqueMaterial);
+  });
 
   // Leave the raw GLTF root clean.
   root.position.set(0, 0, 0);
@@ -1011,7 +1056,11 @@ function prepareArenaModelTransform(root, mountGroup, targetHeightOverride) {
 
   const sourceHeight = Math.max(size.y || 1, 1);
   const targetHeight = targetHeightOverride || cfg.actorHeight || 95;
-  const scale = targetHeight / sourceHeight;
+  const configuredActorScale = Number(cfg.actorScale);
+  const actorScaleMultiplier = Number.isFinite(configuredActorScale) && configuredActorScale > 0
+    ? configuredActorScale
+    : 1;
+  const scale = (targetHeight / sourceHeight) * actorScaleMultiplier;
 
   orientGroup.scale.setScalar(scale);
   orientGroup.updateMatrixWorld(true);
@@ -1044,6 +1093,7 @@ function prepareArenaModelTransform(root, mountGroup, targetHeightOverride) {
     },
     size: `${sizeAfterScale.x.toFixed(1)} x ${sizeAfterScale.y.toFixed(1)} x ${sizeAfterScale.z.toFixed(1)}`,
     scale: scale.toFixed(2),
+    actorScaleMultiplier: actorScaleMultiplier.toFixed(2),
   });
 }
   
@@ -1374,6 +1424,8 @@ function prepareDummyModel(root, mountGroup) {
     state.camera.position.set(0, 1200, 0);
     state.camera.up.set(0, 0, -1);
     state.camera.lookAt(0, 0, 0);
+    state.cameraShake.basePosition = state.camera.position.clone();
+    state.cameraShake.baseTarget = new THREE.Vector3(0, 0, 0);
 
     state.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -1960,6 +2012,12 @@ function prepareDummyModel(root, mountGroup) {
 
   function getWorldPosition(actor) {
     return getWorldPositionFromCoords(actor.x, actor.y);
+  }
+
+  function getArenaActorYOffset() {
+    const raw = Number(cfg.modelYOffset);
+    if (!Number.isFinite(raw)) return 0;
+    return Math.max(0, raw);
   }
 
   function getWorldPositionFromCoords(x, y) {
@@ -2893,35 +2951,57 @@ function prepareDummyModel(root, mountGroup) {
       tintAllLoadedModelsIfNeeded();
     };
 
-    state.loader.load(
-      glbPath,
-      (gltf) => {
-        if (token !== state.characterLoadToken) return;
-        const ok = attachCharacterInstance('player', gltf, prepareArenaModel, setArenaPlayerState, animationMode);
-        playerLoaded = !!ok;
-        tryMarkReady();
-        log(`Loaded ${desiredSet} player character`);
-      },
-      undefined,
-      (error) => {
-        console.error(`[Outra3D] Failed to load ${desiredSet} player GLB:`, error);
-      }
-    );
+    const fallbackGlbPath = desiredSet === 'arena'
+      ? String(getLobbyCharacterConfig().glb || '').trim()
+      : '';
 
-    state.loader.load(
-      glbPath,
-      (gltf) => {
-        if (token !== state.characterLoadToken) return;
-        const ok = attachCharacterInstance('dummy', gltf, prepareDummyModel, setDummyState, animationMode);
-        dummyLoaded = !!ok;
-        tryMarkReady();
-        log(`Loaded ${desiredSet} dummy character`);
-      },
-      undefined,
-      (error) => {
-        console.error(`[Outra3D] Failed to load ${desiredSet} dummy GLB:`, error);
-      }
-    );
+    const loadSlotCharacter = (slotName, prepareFn, setStateFn, onLoaded) => {
+      const loadWithFallback = (path, usedFallback = false) => {
+        if (!path) {
+          if (typeof onLoaded === 'function') onLoaded(false);
+          return;
+        }
+
+        state.loader.load(
+          path,
+          (gltf) => {
+            if (token !== state.characterLoadToken) return;
+            const ok = attachCharacterInstance(slotName, gltf, prepareFn, setStateFn, animationMode);
+            if (typeof onLoaded === 'function') onLoaded(!!ok);
+            log(`Loaded ${desiredSet} ${slotName} character${usedFallback ? ' (fallback)' : ''}`);
+          },
+          undefined,
+          (error) => {
+            if (
+              !usedFallback &&
+              fallbackGlbPath &&
+              fallbackGlbPath !== path
+            ) {
+              console.warn(
+                `[Outra3D] Failed to load ${desiredSet} ${slotName} GLB (${path}). Retrying with fallback ${fallbackGlbPath}.`,
+                error
+              );
+              loadWithFallback(fallbackGlbPath, true);
+              return;
+            }
+            console.error(`[Outra3D] Failed to load ${desiredSet} ${slotName} GLB:`, error);
+            if (typeof onLoaded === 'function') onLoaded(false);
+          }
+        );
+      };
+
+      loadWithFallback(glbPath, false);
+    };
+
+    loadSlotCharacter('player', prepareArenaModel, setArenaPlayerState, (ok) => {
+      playerLoaded = !!ok;
+      tryMarkReady();
+    });
+
+    loadSlotCharacter('dummy', prepareDummyModel, setDummyState, (ok) => {
+      dummyLoaded = !!ok;
+      tryMarkReady();
+    });
   }
 
   function syncCharacterSetForPhase() {
@@ -2929,6 +3009,19 @@ function prepareDummyModel(root, mountGroup) {
     if (state.activeCharacterSet !== desiredSet) {
       switchCharacterSet(desiredSet);
     }
+  }
+
+  function ensureArenaCharacterRecovery(nowSec) {
+    if (!isArenaPhase()) return;
+    if (state.activeCharacterSet !== 'arena') return;
+    if (state.ready && state.player.root && state.dummy.root) return;
+
+    const now = Number.isFinite(Number(nowSec)) ? Number(nowSec) : (performance.now() * 0.001);
+    if ((now - state.lastArenaRecoveryAt) < 2.0) return;
+
+    state.lastArenaRecoveryAt = now;
+    console.warn('[Outra3D] Arena character missing/incomplete, retrying arena character load.');
+    forceCharacterSet('arena');
   }
 
   function forceCharacterSet(nextSet = 'arena') {
@@ -3367,7 +3460,7 @@ function prepareDummyModel(root, mountGroup) {
 
     state.player.rootGroup.position.set(
       world.x,
-      cfg.modelYOffset || 0,
+      getArenaActorYOffset(),
       world.z
     );
 
@@ -3439,7 +3532,7 @@ state.player.lastWorldZ = world.z;
     const world = getWorldPosition(dummy);
     state.dummy.rootGroup.position.set(
       world.x,
-      cfg.modelYOffset || 0,
+      getArenaActorYOffset(),
       world.z
     );
 
@@ -3448,9 +3541,13 @@ state.player.lastWorldZ = world.z;
       setShadowScaleMultiplier(state.dummy.shadow, 1.0);
     }
 
-    const dx = player.x - dummy.x;
-    const dy = player.y - dummy.y;
-    const aimAngle = Math.atan2(dy, dx);
+    let aimX = Number(dummy.aimX);
+    let aimY = Number(dummy.aimY);
+    if (!Number.isFinite(aimX) || !Number.isFinite(aimY) || (Math.abs(aimX) + Math.abs(aimY)) < 0.0001) {
+      aimX = player.x - dummy.x;
+      aimY = player.y - dummy.y;
+    }
+    const aimAngle = Math.atan2(aimY, aimX);
     if (state.dummy.yawGroup) {
             state.dummy.yawGroup.rotation.y = -aimAngle - Math.PI * 0.5;
     }
@@ -3471,7 +3568,7 @@ state.dummy.lastWorldZ = world.z;
     if (state.dummy.hitTimer > 0) {
       state.dummy.hitTimer = Math.max(0, state.dummy.hitTimer - dt);
       setDummyState('hit');
-    } else if (state.dummy.dashTimer > 0) {
+    } else if (state.dummy.dashTimer > 0 || dummy.chargeActive) {
       state.dummy.dashTimer = Math.max(0, state.dummy.dashTimer - dt);
       setDummyState(state.dummy.states.has('dash') ? 'dash' : 'run');
     } else if (state.dummy.castTimer > 0) {
@@ -3636,6 +3733,52 @@ state.dummy.lastWorldZ = world.z;
     }
   }
 
+  function addCameraShake(intensity = 0.2, durationSec = 0.12) {
+    const safeIntensity = Math.max(0, Math.min(1.2, Number(intensity) || 0));
+    if (safeIntensity <= 0) return;
+    const safeDuration = Math.max(0.06, Math.min(CAMERA_SHAKE_MAX_DURATION, Number(durationSec) || 0.12));
+
+    state.cameraShake.intensity = Math.max(state.cameraShake.intensity * 0.72, safeIntensity);
+    state.cameraShake.duration = Math.max(state.cameraShake.duration, safeDuration);
+    state.cameraShake.timeLeft = Math.max(state.cameraShake.timeLeft, safeDuration);
+    state.cameraShake.elapsed = 0;
+  }
+
+  function updateCameraShake(dt) {
+    if (!state.camera || !state.cameraShake.basePosition || !state.cameraShake.baseTarget) return;
+
+    if (state.cameraShake.timeLeft > 0) {
+      state.cameraShake.timeLeft = Math.max(0, state.cameraShake.timeLeft - dt);
+      state.cameraShake.elapsed += dt;
+      state.cameraShake.phase += dt * 34;
+
+      const duration = Math.max(0.001, Number(state.cameraShake.duration) || 0.001);
+      const lifeRatio = Math.max(0, state.cameraShake.timeLeft / duration);
+      const amplitude = CAMERA_SHAKE_MAX_WORLD_OFFSET
+        * Math.max(0, Number(state.cameraShake.intensity) || 0)
+        * (0.22 + (lifeRatio * lifeRatio * 0.78));
+
+      const offsetX = Math.sin(state.cameraShake.phase * 1.31) * amplitude;
+      const offsetZ = Math.cos(state.cameraShake.phase * 1.71) * amplitude * 0.88;
+      state.camera.position.set(
+        state.cameraShake.basePosition.x + offsetX,
+        state.cameraShake.basePosition.y,
+        state.cameraShake.basePosition.z + offsetZ
+      );
+      state.camera.lookAt(state.cameraShake.baseTarget);
+
+      if (state.cameraShake.timeLeft <= 0) {
+        state.cameraShake.intensity = 0;
+        state.cameraShake.duration = 0;
+        state.cameraShake.elapsed = 0;
+      }
+      return;
+    }
+
+    state.camera.position.copy(state.cameraShake.basePosition);
+    state.camera.lookAt(state.cameraShake.baseTarget);
+  }
+
   function updateMixers(dt) {
     if (state.player.mixer) {
       state.player.mixer.update(dt);
@@ -3713,6 +3856,7 @@ state.dummy.lastWorldZ = world.z;
 
     update(dt) {
       syncCharacterSetForPhase();
+      ensureArenaCharacterRecovery(performance.now() * 0.001);
       if (state.arenaFloorReady) {
         updateArenaFloorPose();
       }
@@ -3739,6 +3883,7 @@ state.dummy.lastWorldZ = world.z;
       stabilizeGameplayRootMotion();
       updateChargeAfterimageEffect(dt);
       updateHitFlashes(dt);
+      updateCameraShake(dt);
 
       if (gameState === 'lobby') {
         if (state.preview.renderer && state.preview.scene && state.preview.camera) {
@@ -3835,6 +3980,10 @@ state.dummy.lastWorldZ = world.z;
 
     spawnHitFlash(position, options = {}) {
       spawnArenaHitFlashSprite(position, options);
+    },
+
+    addScreenShake(intensity = 0.2, durationSec = 0.12) {
+      addCameraShake(intensity, durationSec);
     },
 
     triggerCast() {

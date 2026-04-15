@@ -631,6 +631,234 @@ function spawnDamageText(x, y, amount, color = '#ffd36b', prefix = '-') {
   damageTexts.push({ x, y: y - 12, value: `${prefix}${Math.round(amount)}`, life: 0.75, vy: -34, color });
 }
 
+const COMBAT_FEEL = Object.freeze({
+  maxShakePx: 10,
+  maxShakeDuration: 0.22,
+  hitFlashDuration: 0.16,
+  strongHitThreshold: 8.4,
+  eliminationPulseDuration: 0.62,
+});
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
+}
+
+function triggerCombatScreenShake(intensity = 0.2, duration = 0.11) {
+  const safeIntensity = clamp01(intensity);
+  const safeDuration = Math.max(0.05, Math.min(COMBAT_FEEL.maxShakeDuration, Number(duration) || 0.11));
+  const shake = combatFx.shake;
+  shake.intensity = Math.max(shake.intensity * 0.76, safeIntensity);
+  shake.duration = Math.max(shake.duration, safeDuration);
+  shake.timeLeft = Math.max(shake.timeLeft, safeDuration);
+  shake.elapsed = 0;
+
+  if (window.outraThree && typeof window.outraThree.addScreenShake === 'function') {
+    window.outraThree.addScreenShake(safeIntensity, safeDuration);
+  }
+}
+
+function getCombatScreenShakeOffset() {
+  return {
+    x: Number(combatFx.shake.x) || 0,
+    y: Number(combatFx.shake.y) || 0,
+  };
+}
+
+function triggerActorHitFlash(target = 'player', duration = COMBAT_FEEL.hitFlashDuration) {
+  const safeDuration = Math.max(0.06, Math.min(0.22, Number(duration) || COMBAT_FEEL.hitFlashDuration));
+  if (target === 'dummy') {
+    combatFx.actorHitFlash.dummy = Math.max(combatFx.actorHitFlash.dummy, safeDuration);
+    return;
+  }
+  combatFx.actorHitFlash.player = Math.max(combatFx.actorHitFlash.player, safeDuration);
+}
+
+function getActorHitFlash(target = 'player') {
+  return target === 'dummy'
+    ? Math.max(0, Number(combatFx.actorHitFlash.dummy) || 0)
+    : Math.max(0, Number(combatFx.actorHitFlash.player) || 0);
+}
+
+function pushCombatImpactWave(x, y, options = {}) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const duration = Math.max(0.12, Math.min(0.38, Number(options.duration) || 0.24));
+  combatFx.impactWaves.push({
+    x,
+    y,
+    life: duration,
+    maxLife: duration,
+    startRadius: Math.max(12, Number(options.startRadius) || 20),
+    endRadius: Math.max(20, Number(options.endRadius) || 74),
+    color: String(options.color || '255,190,120'),
+    alpha: clamp01(options.alpha == null ? 0.66 : options.alpha),
+    fillAlpha: clamp01(options.fillAlpha == null ? 0.2 : options.fillAlpha),
+    width: Math.max(1, Number(options.width) || 2.8),
+  });
+  if (combatFx.impactWaves.length > 36) {
+    combatFx.impactWaves.splice(0, combatFx.impactWaves.length - 36);
+  }
+}
+
+function pushDirectionalWave(x, y, dx, dy, options = {}) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const dir = normalized(Number(dx) || 0, Number(dy) || 0);
+  const duration = Math.max(0.12, Math.min(0.36, Number(options.duration) || 0.22));
+  combatFx.directionalWaves.push({
+    x,
+    y,
+    dx: dir.x,
+    dy: dir.y,
+    life: duration,
+    maxLife: duration,
+    travel: Math.max(18, Number(options.travel) || 86),
+    spread: Math.max(8, Number(options.spread) || 22),
+    color: String(options.color || '184,220,255'),
+    alpha: clamp01(options.alpha == null ? 0.56 : options.alpha),
+    width: Math.max(1, Number(options.width) || 2.4),
+  });
+  if (combatFx.directionalWaves.length > 28) {
+    combatFx.directionalWaves.splice(0, combatFx.directionalWaves.length - 28);
+  }
+}
+
+function triggerEliminationPulse(x, y, winnerPlayerNumber = null, eliminatedPlayerNumber = null) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const duration = COMBAT_FEEL.eliminationPulseDuration;
+  combatFx.eliminationPulse = {
+    x,
+    y,
+    life: duration,
+    maxLife: duration,
+    winnerPlayerNumber: Number.isFinite(Number(winnerPlayerNumber)) ? Number(winnerPlayerNumber) : null,
+    eliminatedPlayerNumber: Number.isFinite(Number(eliminatedPlayerNumber)) ? Number(eliminatedPlayerNumber) : null,
+  };
+}
+
+function resetCombatFeedbackState() {
+  combatFx.shake.x = 0;
+  combatFx.shake.y = 0;
+  combatFx.shake.intensity = 0;
+  combatFx.shake.duration = 0;
+  combatFx.shake.timeLeft = 0;
+  combatFx.shake.elapsed = 0;
+  combatFx.impactWaves.length = 0;
+  combatFx.directionalWaves.length = 0;
+  combatFx.actorHitFlash.player = 0;
+  combatFx.actorHitFlash.dummy = 0;
+  combatFx.eliminationPulse.life = 0;
+  combatFx.eliminationPulse.maxLife = 0;
+  combatFx.trailEmit.player = 0;
+  combatFx.trailEmit.dummy = 0;
+}
+
+function updateTransientCombatVisuals(dt) {
+  const delta = Math.max(0, Number(dt) || 0);
+  if (delta <= 0) return;
+
+  for (let i = particles.length - 1; i >= 0; i -= 1) {
+    const p = particles[i];
+    p.x += p.vx * delta;
+    p.y += p.vy * delta;
+    p.life -= delta;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  for (let i = damageTexts.length - 1; i >= 0; i -= 1) {
+    const d = damageTexts[i];
+    d.y += d.vy * delta;
+    d.life -= delta;
+    if (d.life <= 0) damageTexts.splice(i, 1);
+  }
+}
+
+function getAbilityFeedbackPalette(abilityId = '', hitType = '') {
+  const id = String(abilityId || '').trim().toLowerCase();
+  const type = String(hitType || '').trim().toLowerCase();
+
+  if (type === 'shield_block') {
+    return {
+      color: '154,214,255',
+      burst: 'rgba(146,214,255,0.92)',
+      textColor: '#b7e4ff',
+      text: 'BLOCK',
+      shake: 0.1,
+      waveTravel: 68,
+    };
+  }
+
+  switch (id) {
+    case 'fireblast':
+      return { color: '255,168,96', burst: 'rgba(255,170,92,0.95)', textColor: '#ffd8a0', text: 'HIT', shake: 0.18, waveTravel: 72 };
+    case 'blink':
+      return { color: '195,162,255', burst: 'rgba(197,164,255,0.9)', textColor: '#ddc6ff', text: 'BLINK', shake: 0.12, waveTravel: 64 };
+    case 'shield':
+      return { color: '158,228,255', burst: 'rgba(158,228,255,0.84)', textColor: '#c8efff', text: 'BLOCK', shake: 0.1, waveTravel: 64 };
+    case 'gust':
+      return { color: '170,242,255', burst: 'rgba(170,242,255,0.9)', textColor: '#ccf7ff', text: 'GUST', shake: 0.2, waveTravel: 100 };
+    case 'charge':
+      return { color: '214,156,255', burst: 'rgba(214,156,255,0.95)', textColor: '#e4c4ff', text: 'CHARGE', shake: 0.34, waveTravel: 122 };
+    case 'shock':
+      return { color: '255,174,138', burst: 'rgba(255,174,138,0.94)', textColor: '#ffd0b4', text: 'SHOCK', shake: 0.28, waveTravel: 108 };
+    case 'hook':
+      return { color: '166,212,255', burst: 'rgba(166,212,255,0.9)', textColor: '#d2e9ff', text: 'HOOK', shake: 0.24, waveTravel: 96 };
+    case 'wall':
+      return { color: '168,206,255', burst: 'rgba(168,206,255,0.9)', textColor: '#d8e8ff', text: 'WALL', shake: 0.16, waveTravel: 84 };
+    case 'rewind':
+      return { color: '196,168,255', burst: 'rgba(196,168,255,0.92)', textColor: '#e2d3ff', text: 'REWIND', shake: 0.15, waveTravel: 90 };
+    default:
+      return { color: '220,220,255', burst: 'rgba(220,220,255,0.86)', textColor: '#eff1ff', text: 'HIT', shake: 0.14, waveTravel: 78 };
+  }
+}
+
+function updateCombatFeedback(dt) {
+  const delta = Math.max(0, Number(dt) || 0);
+  if (delta <= 0) return;
+
+  const shake = combatFx.shake;
+  if (shake.timeLeft > 0) {
+    shake.timeLeft = Math.max(0, shake.timeLeft - delta);
+    shake.elapsed += delta;
+    const t = shake.duration > 0 ? (shake.timeLeft / shake.duration) : 0;
+    const amplitude = COMBAT_FEEL.maxShakePx * clamp01(shake.intensity) * (0.24 + (t * t * 0.76));
+    const pulse = 18 + (shake.elapsed * 32);
+    shake.x = Math.sin(pulse * 0.97) * amplitude;
+    shake.y = Math.cos(pulse * 1.23) * amplitude * 0.82;
+    if (shake.timeLeft <= 0) {
+      shake.x = 0;
+      shake.y = 0;
+      shake.intensity = 0;
+      shake.duration = 0;
+      shake.elapsed = 0;
+    }
+  } else {
+    shake.x = 0;
+    shake.y = 0;
+  }
+
+  combatFx.actorHitFlash.player = Math.max(0, combatFx.actorHitFlash.player - delta);
+  combatFx.actorHitFlash.dummy = Math.max(0, combatFx.actorHitFlash.dummy - delta);
+
+  for (let i = combatFx.impactWaves.length - 1; i >= 0; i -= 1) {
+    const wave = combatFx.impactWaves[i];
+    wave.life -= delta;
+    if (wave.life <= 0) {
+      combatFx.impactWaves.splice(i, 1);
+    }
+  }
+
+  for (let i = combatFx.directionalWaves.length - 1; i >= 0; i -= 1) {
+    const wave = combatFx.directionalWaves[i];
+    wave.life -= delta;
+    if (wave.life <= 0) {
+      combatFx.directionalWaves.splice(i, 1);
+    }
+  }
+
+  if (combatFx.eliminationPulse.life > 0) {
+    combatFx.eliminationPulse.life = Math.max(0, combatFx.eliminationPulse.life - delta);
+  }
+}
+
 function clearRewindHistory() {
   rewindHistory.length = 0;
   rewindLastSampleAt = 0;
@@ -764,10 +992,30 @@ function damagePlayer(amount) {
   const now = performance.now() / 1000;
   if (now < player.shieldUntil) {
     spawnDamageText(player.x, player.y - player.r, 0, '#9fd8ff', 'Block');
+    pushCombatImpactWave(player.x, player.y, {
+      color: '154,214,255',
+      duration: 0.16,
+      startRadius: player.r + 9,
+      endRadius: player.r + 40,
+      alpha: 0.52,
+      fillAlpha: 0.12,
+      width: 2.1,
+    });
     return;
   }
   player.hp = Math.max(0, player.hp - amount);
   if (window.outraThree && window.outraThree.triggerHit) window.outraThree.triggerHit();
+  triggerActorHitFlash('player', COMBAT_FEEL.hitFlashDuration);
+  pushCombatImpactWave(player.x, player.y, {
+    color: '255,176,132',
+    duration: 0.2,
+    startRadius: player.r + 8,
+    endRadius: player.r + 52,
+    alpha: 0.6,
+    fillAlpha: 0.14,
+    width: 2.8,
+  });
+  triggerCombatScreenShake(0.2, 0.11);
   spawnDamageText(player.x, player.y - player.r, amount);
   soundHit();
   if (player.hp <= 0) killPlayer('HP reached 0');
@@ -781,6 +1029,17 @@ function damageDummy(amount) {
     window.outraThree.triggerDummyHit();
   }
 
+  triggerActorHitFlash('dummy', COMBAT_FEEL.hitFlashDuration);
+  pushCombatImpactWave(dummy.x, dummy.y, {
+    color: '255,176,132',
+    duration: 0.2,
+    startRadius: dummy.r + 8,
+    endRadius: dummy.r + 52,
+    alpha: 0.6,
+    fillAlpha: 0.14,
+    width: 2.8,
+  });
+  triggerCombatScreenShake(0.2, 0.11);
   spawnDamageText(dummy.x, dummy.y - dummy.r, amount);
   soundHit();
   if (dummy.hp <= 0) killDummy('HP reached 0');
@@ -1323,6 +1582,17 @@ function killPlayer(reason) {
   player.alive = false;
   player.deadReason = reason;
   spawnBurst(player.x, player.y, 'rgba(255,90,50,0.95)', 24, 260);
+  pushCombatImpactWave(player.x, player.y, {
+    color: '255,116,88',
+    duration: 0.36,
+    startRadius: player.r + 16,
+    endRadius: player.r + 120,
+    alpha: 0.78,
+    fillAlpha: 0.18,
+    width: 3.6,
+  });
+  triggerEliminationPulse(player.x, player.y, null, 1);
+  triggerCombatScreenShake(0.54, 0.2);
   endMatch(false);
 }
 
@@ -1331,6 +1601,17 @@ function killDummy(reason) {
   dummy.alive = false;
   dummy.deadReason = reason;
   spawnBurst(dummy.x, dummy.y, 'rgba(255,180,70,0.95)', 24, 260);
+  pushCombatImpactWave(dummy.x, dummy.y, {
+    color: '255,164,88',
+    duration: 0.36,
+    startRadius: dummy.r + 16,
+    endRadius: dummy.r + 120,
+    alpha: 0.78,
+    fillAlpha: 0.18,
+    width: 3.6,
+  });
+  triggerEliminationPulse(dummy.x, dummy.y, 1, 2);
+  triggerCombatScreenShake(0.54, 0.2);
   endMatch(true);
 }
 
@@ -1417,6 +1698,7 @@ function resetRound() {
   winnerReward        = null;
   resultTimer         = 0;
   lavaSoundTimer      = 0;
+  resetCombatFeedbackState();
   resetMoveStick();
   skillAimPreview.active = false;
   skillAimPreview.type   = null;
@@ -1924,6 +2206,14 @@ function getDraftTileUnderCursor(layout) {
   return null;
 }
 
+function getMultiplayerDraftPresentationSnapshot() {
+  const api = window.outraMultiplayer;
+  if (!api || typeof api.getPresentationSnapshot !== 'function') return null;
+  const snapshot = api.getPresentationSnapshot();
+  if (!snapshot || snapshot.active !== true || !snapshot.isDraftActive) return null;
+  return snapshot;
+}
+
 function advanceDraftTurn() {
   const order = Array.isArray(draftState.order) ? draftState.order : [];
   const orderLength = Math.max(1, order.length);
@@ -1977,7 +2267,9 @@ function commitDraftPick(spellId) {
 }
 
 function tryDraftPickAtCursor() {
-  if (gameState !== 'draft') return false;
+  const multiplayerDraftSnapshot = getMultiplayerDraftPresentationSnapshot();
+  const multiplayerDraftActive = !!multiplayerDraftSnapshot;
+  if (gameState !== 'draft' && !multiplayerDraftActive) return false;
   if (menuOpen || draftState.complete) return false;
 
   const activePlayerId = getDraftActivePlayerId();
@@ -1988,6 +2280,24 @@ function tryDraftPickAtCursor() {
 
   const tile = getDraftTileUnderCursor(layout);
   if (!tile) return false;
+
+  if (multiplayerDraftActive) {
+    let requested = false;
+    if (typeof requestMultiplayerDraftPick === 'function') {
+      requested = !!requestMultiplayerDraftPick(tile.id);
+    } else {
+      const api = window.outraMultiplayer;
+      if (api && typeof api.requestDraftPick === 'function') {
+        api.requestDraftPick(tile.id);
+        requested = true;
+      }
+    }
+    if (requested) {
+      draftState.holdSpellId = null;
+      draftState.holdTime = 0;
+    }
+    return requested;
+  }
 
   const picked = commitDraftPick(tile.id);
   if (picked) {
@@ -2074,7 +2384,10 @@ function resetDraftPhase() {
 }
 
 function updateDraftPhase(dt) {
-  if (gameState !== 'draft') {
+  const multiplayerDraftSnapshot = getMultiplayerDraftPresentationSnapshot();
+  const multiplayerDraftActive = !!multiplayerDraftSnapshot;
+
+  if (gameState !== 'draft' && !multiplayerDraftActive) {
     stopDraftSpellHoverSound();
     return;
   }
@@ -2117,8 +2430,28 @@ function updateDraftPhase(dt) {
           draftState.holdTime = 0;
         }
         draftState.holdTime += dt;
-        if (draftState.holdTime >= Math.max(0.1, Number(draftState.holdDuration) || 0.6)) {
-          commitDraftPick(tile.id);
+        const holdThreshold = multiplayerDraftActive
+          ? Math.max(0.85, Number(draftState.holdDuration) || 0.6)
+          : Math.max(0.1, Number(draftState.holdDuration) || 0.6);
+        if (draftState.holdTime >= holdThreshold) {
+          if (multiplayerDraftActive) {
+            let requested = false;
+            if (typeof requestMultiplayerDraftPick === 'function') {
+              requested = !!requestMultiplayerDraftPick(tile.id);
+            } else {
+              const api = window.outraMultiplayer;
+              if (api && typeof api.requestDraftPick === 'function') {
+                api.requestDraftPick(tile.id);
+                requested = true;
+              }
+            }
+            if (requested) {
+              draftState.holdSpellId = null;
+              draftState.holdTime = 0;
+            }
+          } else {
+            commitDraftPick(tile.id);
+          }
         }
       }
     } else {
@@ -2127,9 +2460,13 @@ function updateDraftPhase(dt) {
       draftState.holdTime = 0;
     }
 
-    draftState.turnTimeLeft = Math.max(0, draftState.turnTimeLeft - dt);
-    if (draftState.turnTimeLeft <= 0 && !draftState.complete) {
-      autoAssignDraftPick();
+    if (!multiplayerDraftActive) {
+      draftState.turnTimeLeft = Math.max(0, draftState.turnTimeLeft - dt);
+      if (draftState.turnTimeLeft <= 0 && !draftState.complete) {
+        autoAssignDraftPick();
+      }
+    } else {
+      draftState.turnTimeLeft = Math.max(0, Number(draftState.timeLeft) || 0);
     }
   } else {
     stopDraftSpellHoverSound();
@@ -2138,7 +2475,10 @@ function updateDraftPhase(dt) {
     const nowSec = performance.now() / 1000;
     if (!Number.isFinite(draftState.completeAt) || draftState.completeAt <= 0) {
       draftState.completeAt = nowSec;
-    } else if (nowSec - draftState.completeAt >= Math.max(0, Number(draftState.autoStartDelay) || 1)) {
+    } else if (
+      !multiplayerDraftActive
+      && nowSec - draftState.completeAt >= Math.max(0, Number(draftState.autoStartDelay) || 1)
+    ) {
       startMatch();
       return;
     }
@@ -2292,24 +2632,864 @@ function startMatch(options = {}) {
 }
 
 // ── Main Update ───────────────────────────────────────────────
+const MP_ARENA_DEFAULT_BOUNDARY_RADIUS = 12;
+const MP_TELEPORT_CAST_DISTANCE_UNITS = 1.45;
+const MP_REMOTE_POSITION_LERP_FACTOR = 0.15;
+const MP_REMOTE_POSITION_SNAP_DISTANCE = 200;
+const multiplayerArenaBridgeState = {
+  active: false,
+  seenProjectileIds: new Set(),
+  seenWallIds: new Set(),
+  seenHitIds: new Set(),
+  projectilesById: new Map(),
+  hooksById: new Map(),
+  wallsById: new Map(),
+  lastMyChargeActive: false,
+  lastOppChargeActive: false,
+  lastMyShieldActive: false,
+  lastOppShieldActive: false,
+  lastMyMappedPos: null,
+  lastOppMappedPos: null,
+  lastMatchPhase: '',
+  lastRoundPhase: '',
+  lastMatchId: '',
+  lastTrailAt: {
+    player: 0,
+    dummy: 0,
+  },
+};
+
+function resetMultiplayerArenaBridgeTransientState(options = {}) {
+  const preserveMatchIdentity = options && options.preserveMatchIdentity === true;
+  multiplayerArenaBridgeState.seenProjectileIds.clear();
+  multiplayerArenaBridgeState.seenWallIds.clear();
+  multiplayerArenaBridgeState.seenHitIds.clear();
+  multiplayerArenaBridgeState.projectilesById.clear();
+  multiplayerArenaBridgeState.hooksById.clear();
+  multiplayerArenaBridgeState.wallsById.clear();
+  multiplayerArenaBridgeState.lastMyChargeActive = false;
+  multiplayerArenaBridgeState.lastOppChargeActive = false;
+  multiplayerArenaBridgeState.lastMyShieldActive = false;
+  multiplayerArenaBridgeState.lastOppShieldActive = false;
+  multiplayerArenaBridgeState.lastMyMappedPos = null;
+  multiplayerArenaBridgeState.lastOppMappedPos = null;
+  multiplayerArenaBridgeState.lastMatchPhase = '';
+  multiplayerArenaBridgeState.lastTrailAt.player = 0;
+  multiplayerArenaBridgeState.lastTrailAt.dummy = 0;
+  multiplayerArenaBridgeState.lastRoundPhase = '';
+  if (!preserveMatchIdentity) {
+    multiplayerArenaBridgeState.lastMatchId = '';
+  }
+
+  projectiles.length = 0;
+  hooks.length = 0;
+  walls.length = 0;
+  particles.length = 0;
+  damageTexts.length = 0;
+  player.chargeActive = false;
+  dummy.chargeActive = false;
+  player.shieldUntil = 0;
+  dummy.shieldUntil = 0;
+  dummy.targetX = Number.isFinite(dummy.x) ? dummy.x : 0;
+  dummy.targetY = Number.isFinite(dummy.y) ? dummy.y : 0;
+  resetCombatFeedbackState();
+}
+
+function getMultiplayerArenaRuntimeSnapshot() {
+  const api = window.outraMultiplayer;
+  if (!api || typeof api.getRuntimeSnapshot !== 'function') return null;
+  const snapshot = api.getRuntimeSnapshot();
+  if (!snapshot || snapshot.active !== true) return null;
+  return snapshot;
+}
+
+function isMultiplayerArenaRuntimeActive(snapshot) {
+  return !!(snapshot && snapshot.active && snapshot.isArenaActive);
+}
+
+function getMultiplayerArenaScale(snapshot) {
+  const boundaryRadius = Math.max(
+    0.01,
+    Number(snapshot?.arenaBoundary?.radius) || MP_ARENA_DEFAULT_BOUNDARY_RADIUS
+  );
+  return Math.max(1, Number(arena.radius) || Number(arena.baseRadius) || 1) / boundaryRadius;
+}
+
+function mapMultiplayerArenaPointToCanvas(snapshot, position) {
+  const source = position && typeof position === 'object' ? position : null;
+  if (!source) return null;
+  const px = Number(source.x);
+  const py = Number(source.y);
+  if (!Number.isFinite(px) || !Number.isFinite(py)) return null;
+
+  const center = snapshot?.arenaBoundary?.center && typeof snapshot.arenaBoundary.center === 'object'
+    ? snapshot.arenaBoundary.center
+    : { x: 0, y: 0 };
+  const cx = Number(center.x) || 0;
+  const cy = Number(center.y) || 0;
+  const scale = getMultiplayerArenaScale(snapshot);
+
+  return {
+    x: arena.cx + (px - cx) * scale,
+    y: arena.cy + (py - cy) * scale
+  };
+}
+
+function mapMultiplayerArenaVectorToCanvas(snapshot, vector) {
+  const source = vector && typeof vector === 'object' ? vector : null;
+  if (!source) return null;
+  const vx = Number(source.x);
+  const vy = Number(source.y);
+  if (!Number.isFinite(vx) || !Number.isFinite(vy)) return null;
+  const scale = getMultiplayerArenaScale(snapshot);
+  return { x: vx * scale, y: vy * scale };
+}
+
+function normalizeRuntimeAim(vector, fallbackX = 1, fallbackY = 0) {
+  const vx = Number(vector?.x);
+  const vy = Number(vector?.y);
+  if (!Number.isFinite(vx) || !Number.isFinite(vy) || (Math.abs(vx) + Math.abs(vy)) < 0.0001) {
+    return normalized(fallbackX, fallbackY);
+  }
+  return normalized(vx, vy);
+}
+
+function triggerArenaCastForPlayer(snapshot, playerNumber) {
+  const myNumber = Number(snapshot?.myPlayerNumber);
+  if (!Number.isFinite(myNumber) || !window.outraThree) return;
+  if (Number(playerNumber) === myNumber) {
+    if (typeof window.outraThree.triggerCast === 'function') window.outraThree.triggerCast();
+  } else if (typeof window.outraThree.triggerDummyCast === 'function') {
+    window.outraThree.triggerDummyCast();
+  }
+}
+
+function triggerArenaDashForPlayer(snapshot, playerNumber) {
+  const myNumber = Number(snapshot?.myPlayerNumber);
+  if (!Number.isFinite(myNumber) || !window.outraThree) return;
+  if (Number(playerNumber) === myNumber) {
+    if (typeof window.outraThree.triggerDash === 'function') window.outraThree.triggerDash();
+  } else if (typeof window.outraThree.triggerDummyDash === 'function') {
+    window.outraThree.triggerDummyDash();
+  }
+}
+
+function triggerArenaHitForPlayer(snapshot, playerNumber) {
+  const myNumber = Number(snapshot?.myPlayerNumber);
+  if (!Number.isFinite(myNumber) || !window.outraThree) return;
+  if (Number(playerNumber) === myNumber) {
+    if (typeof window.outraThree.triggerHit === 'function') window.outraThree.triggerHit();
+  } else if (typeof window.outraThree.triggerDummyHit === 'function') {
+    window.outraThree.triggerDummyHit();
+  }
+}
+
+function getRuntimePlayerPositionByNumber(snapshot, playerNumber) {
+  const myNumber = Number(snapshot?.myPlayerNumber);
+  const targetNumber = Number(playerNumber);
+  if (!Number.isFinite(myNumber) || !Number.isFinite(targetNumber)) return null;
+  if (targetNumber === myNumber) return snapshot?.myPosition || null;
+  return snapshot?.opponentPosition || null;
+}
+
+function getMappedPlayerPositionByNumber(snapshot, playerNumber) {
+  return mapMultiplayerArenaPointToCanvas(
+    snapshot,
+    getRuntimePlayerPositionByNumber(snapshot, playerNumber)
+  );
+}
+
+function emitKnockbackTrail(actor, actorKey = 'player') {
+  if (!actor || !Number.isFinite(actor.x) || !Number.isFinite(actor.y)) return;
+  const speed = Math.hypot(Number(actor.vx) || 0, Number(actor.vy) || 0);
+  if (speed < COMBAT_FEEL.strongHitThreshold) return;
+
+  const now = performance.now() / 1000;
+  const throttleKey = actorKey === 'dummy' ? 'dummy' : 'player';
+  const lastAt = Number(multiplayerArenaBridgeState.lastTrailAt?.[throttleKey]) || 0;
+  if (now - lastAt < 0.035) return;
+  multiplayerArenaBridgeState.lastTrailAt[throttleKey] = now;
+
+  const dir = normalized(Number(actor.vx) || 0, Number(actor.vy) || 0);
+  const trailColor = throttleKey === 'player'
+    ? 'rgba(190,228,255,0.44)'
+    : 'rgba(255,208,162,0.44)';
+
+  addParticle({
+    x: actor.x - dir.x * (actor.r * 0.8),
+    y: actor.y - dir.y * (actor.r * 0.8),
+    vx: (-dir.x * 60) + ((Math.random() - 0.5) * 42),
+    vy: (-dir.y * 60) + ((Math.random() - 0.5) * 42),
+    life: 0.12,
+    size: 2.2 + Math.random() * 2.8,
+    color: trailColor
+  });
+}
+
+function triggerAbilityCastOriginFeedback(snapshot, ownerPlayerNumber, abilityId = '') {
+  const sourcePoint = getMappedPlayerPositionByNumber(snapshot, ownerPlayerNumber);
+  if (!sourcePoint) return;
+
+  const palette = getAbilityFeedbackPalette(abilityId, 'cast');
+  spawnBurst(sourcePoint.x, sourcePoint.y, palette.burst, 9, 120);
+  pushCombatImpactWave(sourcePoint.x, sourcePoint.y, {
+    color: palette.color,
+    duration: 0.17,
+    startRadius: 18,
+    endRadius: 52,
+    alpha: 0.46,
+    fillAlpha: 0.1,
+    width: 2.1,
+  });
+
+  if (abilityId === 'gust' || abilityId === 'shock' || abilityId === 'charge') {
+    const sourceAim = Number(ownerPlayerNumber) === Number(snapshot?.myPlayerNumber)
+      ? snapshot?.myAimDirection
+      : snapshot?.opponentAimDirection;
+    const dir = normalizeRuntimeAim(sourceAim, 1, 0);
+    pushDirectionalWave(sourcePoint.x, sourcePoint.y, dir.x, dir.y, {
+      color: palette.color,
+      duration: 0.18,
+      travel: palette.waveTravel,
+      spread: 24,
+      alpha: 0.48,
+      width: 2.2,
+    });
+  }
+}
+
+function triggerRewindFeedback(snapshot, hitEvent) {
+  const metadata = hitEvent?.metadata && typeof hitEvent.metadata === 'object'
+    ? hitEvent.metadata
+    : null;
+  const fromMapped = mapMultiplayerArenaPointToCanvas(snapshot, metadata?.from);
+  const toMapped = mapMultiplayerArenaPointToCanvas(snapshot, metadata?.to);
+  if (!fromMapped && !toMapped) return;
+
+  const palette = getAbilityFeedbackPalette('rewind', 'rewind_used');
+  if (fromMapped) {
+    spawnBurst(fromMapped.x, fromMapped.y, 'rgba(180,150,255,0.78)', 10, 90);
+    pushCombatImpactWave(fromMapped.x, fromMapped.y, {
+      color: '190,160,255',
+      duration: 0.16,
+      startRadius: 14,
+      endRadius: 44,
+      alpha: 0.4,
+      fillAlpha: 0.08,
+      width: 2,
+    });
+  }
+  if (toMapped) {
+    spawnBurst(toMapped.x, toMapped.y, palette.burst, 12, 125);
+    pushCombatImpactWave(toMapped.x, toMapped.y, {
+      color: palette.color,
+      duration: 0.2,
+      startRadius: 18,
+      endRadius: 60,
+      alpha: 0.58,
+      fillAlpha: 0.14,
+      width: 2.5,
+    });
+    spawnArenaHitFlash(toMapped.x, toMapped.y, Number(hitEvent?.targetPlayerNumber) === Number(snapshot?.myPlayerNumber) ? 'player' : 'dummy');
+  }
+  if (fromMapped && toMapped) {
+    const ghostSteps = 4;
+    for (let i = 1; i <= ghostSteps; i += 1) {
+      const t = i / (ghostSteps + 1);
+      addParticle({
+        x: fromMapped.x + ((toMapped.x - fromMapped.x) * t),
+        y: fromMapped.y + ((toMapped.y - fromMapped.y) * t),
+        vx: 0,
+        vy: 0,
+        life: 0.12 + (0.03 * i),
+        size: 2.4,
+        color: 'rgba(195,168,255,0.52)',
+      });
+    }
+  }
+  triggerCombatScreenShake(0.15, 0.09);
+}
+
+function triggerMultiplayerHitFeedback(snapshot, hitEvent) {
+  const targetNumber = Number(hitEvent?.targetPlayerNumber);
+  const sourceNumber = Number(hitEvent?.sourcePlayerNumber);
+  const myNumber = Number(snapshot?.myPlayerNumber);
+  const abilityId = String(hitEvent?.abilityId || '').trim().toLowerCase();
+  const hitType = String(hitEvent?.type || '').trim().toLowerCase();
+  const knockback = {
+    x: Number(hitEvent?.knockback?.x) || 0,
+    y: Number(hitEvent?.knockback?.y) || 0,
+  };
+  const targetMapped = getMappedPlayerPositionByNumber(snapshot, targetNumber);
+  const sourceMapped = getMappedPlayerPositionByNumber(snapshot, sourceNumber);
+  const palette = getAbilityFeedbackPalette(abilityId, hitType);
+
+  if (targetMapped) {
+    spawnArenaHitFlash(targetMapped.x, targetMapped.y, targetNumber === myNumber ? 'player' : 'dummy');
+    spawnBurst(targetMapped.x, targetMapped.y, palette.burst, hitType === 'shield_block' ? 10 : 14, 150);
+    pushCombatImpactWave(targetMapped.x, targetMapped.y, {
+      color: palette.color,
+      duration: hitType === 'shield_block' ? 0.17 : 0.23,
+      startRadius: 18,
+      endRadius: hitType === 'shield_block' ? 58 : 84,
+      alpha: hitType === 'shield_block' ? 0.52 : 0.72,
+      fillAlpha: hitType === 'shield_block' ? 0.12 : 0.2,
+      width: hitType === 'shield_block' ? 2.2 : 3.2,
+    });
+    if (hitType !== 'rewind_used') {
+      damageTexts.push({
+        x: targetMapped.x,
+        y: targetMapped.y - 30,
+        value: String(palette.text || 'HIT'),
+        life: 0.34,
+        vy: -26,
+        color: palette.textColor || '#ffe4bf',
+      });
+    }
+    if (knockback.x !== 0 || knockback.y !== 0) {
+      pushDirectionalWave(targetMapped.x, targetMapped.y, knockback.x, knockback.y, {
+        color: palette.color,
+        duration: 0.2,
+        travel: palette.waveTravel,
+        spread: 24,
+        alpha: 0.54,
+        width: 2.3,
+      });
+    }
+  }
+
+  if (sourceMapped && hitType !== 'shield_block') {
+    pushCombatImpactWave(sourceMapped.x, sourceMapped.y, {
+      color: palette.color,
+      duration: 0.15,
+      startRadius: 12,
+      endRadius: 42,
+      alpha: 0.36,
+      fillAlpha: 0.06,
+      width: 1.9,
+    });
+  }
+
+  if (hitType === 'hook_pull' && sourceMapped && targetMapped) {
+    const linkDir = normalized(targetMapped.x - sourceMapped.x, targetMapped.y - sourceMapped.y);
+    pushDirectionalWave(sourceMapped.x, sourceMapped.y, linkDir.x, linkDir.y, {
+      color: '176,214,255',
+      duration: 0.18,
+      travel: Math.max(52, distance(sourceMapped.x, sourceMapped.y, targetMapped.x, targetMapped.y)),
+      spread: 14,
+      alpha: 0.5,
+      width: 2.1,
+    });
+  } else if (hitType === 'rewind_used') {
+    triggerRewindFeedback(snapshot, hitEvent);
+  }
+
+  if (targetNumber === myNumber) {
+    triggerActorHitFlash('player');
+  } else if (Number.isFinite(targetNumber)) {
+    triggerActorHitFlash('dummy');
+  }
+
+  triggerCombatScreenShake(hitType === 'charge_hit' ? 0.3 : palette.shake, hitType === 'charge_hit' ? 0.15 : 0.11);
+}
+
+function triggerMatchPhaseFeedback(snapshot) {
+  const currentPhase = String(snapshot?.matchPhase || '').trim().toLowerCase();
+  const previousPhase = String(multiplayerArenaBridgeState.lastMatchPhase || '').trim().toLowerCase();
+  if (currentPhase === previousPhase) return;
+
+  multiplayerArenaBridgeState.lastMatchPhase = currentPhase;
+  if (currentPhase !== 'match_end') return;
+
+  const eliminatedPlayerNumber = Number(snapshot?.eliminatedPlayerNumber);
+  const winnerPlayerNumber = Number(snapshot?.winnerPlayerNumber);
+  const eliminatedPoint = getMappedPlayerPositionByNumber(snapshot, eliminatedPlayerNumber);
+  if (eliminatedPoint) {
+    spawnBurst(eliminatedPoint.x, eliminatedPoint.y, 'rgba(255,170,112,0.96)', 22, 210);
+    pushCombatImpactWave(eliminatedPoint.x, eliminatedPoint.y, {
+      color: '255,170,112',
+      duration: 0.34,
+      startRadius: 18,
+      endRadius: 132,
+      alpha: 0.82,
+      fillAlpha: 0.22,
+      width: 3.6,
+    });
+    triggerEliminationPulse(eliminatedPoint.x, eliminatedPoint.y, winnerPlayerNumber, eliminatedPlayerNumber);
+  }
+  triggerCombatScreenShake(0.56, 0.2);
+}
+
+function syncMultiplayerArenaActors(snapshot) {
+  const myMapped = mapMultiplayerArenaPointToCanvas(snapshot, snapshot?.myPosition);
+  const oppMapped = mapMultiplayerArenaPointToCanvas(snapshot, snapshot?.opponentPosition);
+  const myVel = mapMultiplayerArenaVectorToCanvas(snapshot, snapshot?.myVelocity);
+  const oppVel = mapMultiplayerArenaVectorToCanvas(snapshot, snapshot?.opponentVelocity);
+  const myAim = normalizeRuntimeAim(snapshot?.myAimDirection, player.aimX || 1, player.aimY || 0);
+  const oppAim = normalizeRuntimeAim(snapshot?.opponentAimDirection, -1, 0);
+  const nowSec = performance.now() / 1000;
+
+  if (myMapped) {
+    player.x = myMapped.x;
+    player.y = myMapped.y;
+  }
+  player.vx = myVel ? myVel.x : 0;
+  player.vy = myVel ? myVel.y : 0;
+  player.aimX = myAim.x;
+  player.aimY = myAim.y;
+  player.shieldUntil = snapshot?.myActiveEffects?.shieldActive
+    ? (nowSec + Math.max(0, Number(snapshot.myActiveEffects.shieldRemainingMs) || 0) / 1000)
+    : 0;
+  player.chargeActive = !!snapshot?.myActiveEffects?.chargeActive;
+  const myChargeDir = normalizeRuntimeAim(snapshot?.myActiveEffects?.chargeDirection, myAim.x, myAim.y);
+  player.chargeDirX = myChargeDir.x;
+  player.chargeDirY = myChargeDir.y;
+
+  dummyEnabled = !!oppMapped;
+  if (oppMapped) {
+    // Remote actor smoothing: keep server-authoritative target, render with lerp.
+    dummy.targetX = oppMapped.x;
+    dummy.targetY = oppMapped.y;
+
+    if (!Number.isFinite(dummy.x) || !Number.isFinite(dummy.y)) {
+      dummy.x = dummy.targetX;
+      dummy.y = dummy.targetY;
+    } else {
+      const dx = dummy.targetX - dummy.x;
+      const dy = dummy.targetY - dummy.y;
+      const dist = Math.hypot(dx, dy);
+
+      // Hard-snap when desync is large to avoid long catch-up trails.
+      if (dist > MP_REMOTE_POSITION_SNAP_DISTANCE) {
+        dummy.x = dummy.targetX;
+        dummy.y = dummy.targetY;
+      } else {
+        dummy.x += dx * MP_REMOTE_POSITION_LERP_FACTOR;
+        dummy.y += dy * MP_REMOTE_POSITION_LERP_FACTOR;
+      }
+    }
+  } else {
+    dummy.targetX = dummy.x;
+    dummy.targetY = dummy.y;
+  }
+  dummy.vx = oppVel ? oppVel.x : 0;
+  dummy.vy = oppVel ? oppVel.y : 0;
+  dummy.aimX = oppAim.x;
+  dummy.aimY = oppAim.y;
+  dummy.shieldUntil = snapshot?.opponentActiveEffects?.shieldActive
+    ? (nowSec + Math.max(0, Number(snapshot.opponentActiveEffects.shieldRemainingMs) || 0) / 1000)
+    : 0;
+  dummy.chargeActive = !!snapshot?.opponentActiveEffects?.chargeActive;
+  const oppChargeDir = normalizeRuntimeAim(snapshot?.opponentActiveEffects?.chargeDirection, oppAim.x, oppAim.y);
+  dummy.chargeDirX = oppChargeDir.x;
+  dummy.chargeDirY = oppChargeDir.y;
+
+  const isMatchEnd = String(snapshot?.matchPhase || '').toLowerCase() === 'match_end' || !!snapshot?.isMatchEnd;
+  const myNumber = Number(snapshot?.myPlayerNumber);
+  const oppNumber = Number(snapshot?.opponentPlayerNumber);
+  const eliminated = Number(snapshot?.eliminatedPlayerNumber);
+  const oppConnected = snapshot?.opponentConnected !== false;
+  player.alive = !isMatchEnd || eliminated !== myNumber;
+  dummy.alive = !!oppMapped && oppConnected && (!isMatchEnd || eliminated !== oppNumber);
+  player.hp = player.alive ? player.maxHp : 0;
+  dummy.hp = dummy.alive ? dummy.maxHp : 0;
+
+  if (player.alive) {
+    emitKnockbackTrail(player, 'player');
+  }
+  if (dummyEnabled && dummy.alive) {
+    emitKnockbackTrail(dummy, 'dummy');
+  }
+}
+
+function syncMultiplayerArenaCollections(snapshot) {
+  const myNumber = Number(snapshot?.myPlayerNumber);
+  const runtimeProjectiles = Array.isArray(snapshot?.projectiles) ? snapshot.projectiles : [];
+  const runtimeWalls = Array.isArray(snapshot?.walls) ? snapshot.walls : [];
+  const scale = getMultiplayerArenaScale(snapshot);
+  const nowMs = Date.now();
+  const projectileMap = multiplayerArenaBridgeState.projectilesById;
+  const hookMap = multiplayerArenaBridgeState.hooksById;
+  const wallMap = multiplayerArenaBridgeState.wallsById;
+  const nextProjectileIds = new Set();
+  const nextHookIds = new Set();
+  const nextWallIds = new Set();
+
+  for (let index = 0; index < runtimeProjectiles.length; index += 1) {
+    const projectile = runtimeProjectiles[index];
+    const mapped = mapMultiplayerArenaPointToCanvas(snapshot, projectile?.position);
+    if (!mapped) continue;
+
+    const owner = Number(projectile?.ownerPlayerNumber) === myNumber ? 'player' : 'dummy';
+    const abilityId = String(projectile?.abilityId || '').trim().toLowerCase();
+    const r = Math.max(4, (Math.max(0.08, Number(projectile?.hitRadius) || 0.28) * scale));
+    const sourceId = String(projectile?.projectileId || '').trim();
+
+    if (abilityId === 'hook') {
+      const hookId = sourceId || `hook-${owner}-${index}`;
+      nextHookIds.add(hookId);
+
+      let hookEntry = hookMap.get(hookId);
+      if (!hookEntry) {
+        hookEntry = { owner, x: 0, y: 0, state: 'flying' };
+        hookMap.set(hookId, hookEntry);
+        hooks.push(hookEntry);
+      }
+
+      hookEntry.owner = owner;
+      hookEntry.x = mapped.x;
+      hookEntry.y = mapped.y;
+      hookEntry.state = 'flying';
+      continue;
+    }
+
+    const projectileId = sourceId || `projectile-${abilityId || 'fire'}-${owner}-${index}`;
+    nextProjectileIds.add(projectileId);
+
+    let projectileEntry = projectileMap.get(projectileId);
+    if (!projectileEntry) {
+      projectileEntry = { owner, x: 0, y: 0, r };
+      projectileMap.set(projectileId, projectileEntry);
+      projectiles.push(projectileEntry);
+    }
+
+    projectileEntry.owner = owner;
+    projectileEntry.x = mapped.x;
+    projectileEntry.y = mapped.y;
+    projectileEntry.r = r;
+  }
+
+  for (const [projectileId, projectileEntry] of projectileMap) {
+    if (nextProjectileIds.has(projectileId)) continue;
+    projectileMap.delete(projectileId);
+    const projectileIndex = projectiles.indexOf(projectileEntry);
+    if (projectileIndex >= 0) projectiles.splice(projectileIndex, 1);
+  }
+
+  for (const [hookId, hookEntry] of hookMap) {
+    if (nextHookIds.has(hookId)) continue;
+    hookMap.delete(hookId);
+    const hookIndex = hooks.indexOf(hookEntry);
+    if (hookIndex >= 0) hooks.splice(hookIndex, 1);
+  }
+
+  for (let index = 0; index < runtimeWalls.length; index += 1) {
+    const wall = runtimeWalls[index];
+    const center = mapMultiplayerArenaPointToCanvas(snapshot, wall?.position);
+    if (!center) continue;
+
+    const expiresAt = Number(wall?.expiresAt) || 0;
+    const spawnedAt = Number(wall?.spawnedAt) || 0;
+    if (expiresAt > 0 && nowMs >= expiresAt) continue;
+
+    const wallId = String(wall?.wallId || '').trim() || `wall-${index}`;
+    nextWallIds.add(wallId);
+
+    const dir = normalizeRuntimeAim(wall?.direction, 1, 0);
+    const side = { x: -dir.y, y: dir.x };
+    const halfLength = Math.max(0.2, Number(wall?.halfLength) || 1.9) * scale;
+    const halfThickness = Math.max(0.1, Number(wall?.halfThickness) || 0.36) * scale;
+    const segmentRadius = Math.max(6, halfThickness);
+    const segmentCount = 7;
+
+    let wallEntry = wallMap.get(wallId);
+    if (!wallEntry) {
+      wallEntry = { segments: [], life: 0, maxLife: 0 };
+      wallMap.set(wallId, wallEntry);
+      walls.push(wallEntry);
+    }
+
+    if (!Array.isArray(wallEntry.segments)) {
+      wallEntry.segments = [];
+    }
+    wallEntry.segments.length = segmentCount;
+
+    for (let i = 0; i < segmentCount; i += 1) {
+      const t = segmentCount <= 1 ? 0 : (i / (segmentCount - 1)) - 0.5;
+      const offset = t * halfLength * 2;
+      let segment = wallEntry.segments[i];
+      if (!segment) {
+        segment = { x: 0, y: 0, r: segmentRadius };
+        wallEntry.segments[i] = segment;
+      }
+      segment.x = center.x + side.x * offset;
+      segment.y = center.y + side.y * offset;
+      segment.r = segmentRadius;
+    }
+
+    const maxLife = Math.max(0.1, (Math.max(spawnedAt + 100, expiresAt) - spawnedAt) / 1000);
+    const life = expiresAt > 0 ? Math.max(0, (expiresAt - nowMs) / 1000) : maxLife;
+    wallEntry.life = life;
+    wallEntry.maxLife = maxLife;
+  }
+
+  for (const [wallId, wallEntry] of wallMap) {
+    if (nextWallIds.has(wallId)) continue;
+    wallMap.delete(wallId);
+    const wallIndex = walls.indexOf(wallEntry);
+    if (wallIndex >= 0) walls.splice(wallIndex, 1);
+  }
+}
+
+function syncMultiplayerArenaFeedback(snapshot) {
+  const myNumber = Number(snapshot?.myPlayerNumber);
+  const oppNumber = Number(snapshot?.opponentPlayerNumber);
+  const runtimeProjectiles = Array.isArray(snapshot?.projectiles) ? snapshot.projectiles : [];
+  const runtimeWalls = Array.isArray(snapshot?.walls) ? snapshot.walls : [];
+  const runtimeHits = Array.isArray(snapshot?.hitEvents) ? snapshot.hitEvents : [];
+
+  triggerMatchPhaseFeedback(snapshot);
+
+  for (const projectile of runtimeProjectiles) {
+    const projectileId = String(projectile?.projectileId || '');
+    if (!projectileId || multiplayerArenaBridgeState.seenProjectileIds.has(projectileId)) continue;
+    multiplayerArenaBridgeState.seenProjectileIds.add(projectileId);
+    triggerArenaCastForPlayer(snapshot, projectile?.ownerPlayerNumber);
+    triggerAbilityCastOriginFeedback(
+      snapshot,
+      projectile?.ownerPlayerNumber,
+      String(projectile?.abilityId || '').trim().toLowerCase()
+    );
+  }
+
+  for (const wall of runtimeWalls) {
+    const wallId = String(wall?.wallId || '');
+    if (!wallId || multiplayerArenaBridgeState.seenWallIds.has(wallId)) continue;
+    multiplayerArenaBridgeState.seenWallIds.add(wallId);
+    triggerArenaCastForPlayer(snapshot, wall?.ownerPlayerNumber);
+    const wallCenter = mapMultiplayerArenaPointToCanvas(snapshot, wall?.position);
+    if (wallCenter) {
+      const style = getAbilityFeedbackPalette('wall', 'cast');
+      spawnBurst(wallCenter.x, wallCenter.y, style.burst, 14, 120);
+      pushCombatImpactWave(wallCenter.x, wallCenter.y, {
+        color: style.color,
+        duration: 0.22,
+        startRadius: 20,
+        endRadius: 80,
+        alpha: 0.6,
+        fillAlpha: 0.14,
+        width: 2.8,
+      });
+      triggerCombatScreenShake(0.16, 0.1);
+    }
+  }
+
+  for (const hitEvent of runtimeHits) {
+    const hitId = String(hitEvent?.hitId || '');
+    if (!hitId || multiplayerArenaBridgeState.seenHitIds.has(hitId)) continue;
+    multiplayerArenaBridgeState.seenHitIds.add(hitId);
+    const hitType = String(hitEvent?.type || '').toLowerCase();
+    if (hitType !== 'rewind_used') {
+      triggerArenaHitForPlayer(snapshot, hitEvent?.targetPlayerNumber);
+      if (hitType !== 'shield_block') {
+        triggerArenaCastForPlayer(snapshot, hitEvent?.sourcePlayerNumber);
+      }
+    } else {
+      triggerArenaCastForPlayer(snapshot, hitEvent?.sourcePlayerNumber);
+    }
+    triggerMultiplayerHitFeedback(snapshot, hitEvent);
+  }
+
+  const myCharge = !!snapshot?.myActiveEffects?.chargeActive;
+  const oppCharge = !!snapshot?.opponentActiveEffects?.chargeActive;
+  const myShield = !!snapshot?.myActiveEffects?.shieldActive;
+  const oppShield = !!snapshot?.opponentActiveEffects?.shieldActive;
+  if (myCharge && !multiplayerArenaBridgeState.lastMyChargeActive) {
+    triggerArenaDashForPlayer(snapshot, myNumber);
+    const source = getMappedPlayerPositionByNumber(snapshot, myNumber);
+    const dir = normalizeRuntimeAim(snapshot?.myActiveEffects?.chargeDirection, snapshot?.myAimDirection?.x || 1, snapshot?.myAimDirection?.y || 0);
+    if (source) {
+      pushDirectionalWave(source.x, source.y, dir.x, dir.y, {
+        color: '214,156,255',
+        duration: 0.2,
+        travel: 118,
+        spread: 22,
+        alpha: 0.62,
+        width: 2.8,
+      });
+      spawnBurst(source.x, source.y, 'rgba(214,156,255,0.9)', 14, 140);
+    }
+  }
+  if (oppCharge && !multiplayerArenaBridgeState.lastOppChargeActive) {
+    triggerArenaDashForPlayer(snapshot, oppNumber);
+    const source = getMappedPlayerPositionByNumber(snapshot, oppNumber);
+    const dir = normalizeRuntimeAim(snapshot?.opponentActiveEffects?.chargeDirection, snapshot?.opponentAimDirection?.x || -1, snapshot?.opponentAimDirection?.y || 0);
+    if (source) {
+      pushDirectionalWave(source.x, source.y, dir.x, dir.y, {
+        color: '214,156,255',
+        duration: 0.2,
+        travel: 118,
+        spread: 22,
+        alpha: 0.62,
+        width: 2.8,
+      });
+      spawnBurst(source.x, source.y, 'rgba(214,156,255,0.9)', 14, 140);
+    }
+  }
+  if (myShield && !multiplayerArenaBridgeState.lastMyShieldActive) {
+    const source = getMappedPlayerPositionByNumber(snapshot, myNumber);
+    if (source) {
+      const shieldStyle = getAbilityFeedbackPalette('shield', 'cast');
+      pushCombatImpactWave(source.x, source.y, {
+        color: shieldStyle.color,
+        duration: 0.2,
+        startRadius: player.r + 10,
+        endRadius: player.r + 54,
+        alpha: 0.54,
+        fillAlpha: 0.14,
+        width: 2.6,
+      });
+    }
+  }
+  if (oppShield && !multiplayerArenaBridgeState.lastOppShieldActive) {
+    const source = getMappedPlayerPositionByNumber(snapshot, oppNumber);
+    if (source) {
+      const shieldStyle = getAbilityFeedbackPalette('shield', 'cast');
+      pushCombatImpactWave(source.x, source.y, {
+        color: shieldStyle.color,
+        duration: 0.2,
+        startRadius: dummy.r + 10,
+        endRadius: dummy.r + 54,
+        alpha: 0.54,
+        fillAlpha: 0.14,
+        width: 2.6,
+      });
+    }
+  }
+  multiplayerArenaBridgeState.lastMyChargeActive = myCharge;
+  multiplayerArenaBridgeState.lastOppChargeActive = oppCharge;
+  multiplayerArenaBridgeState.lastMyShieldActive = myShield;
+  multiplayerArenaBridgeState.lastOppShieldActive = oppShield;
+
+  const scale = getMultiplayerArenaScale(snapshot);
+  const jumpThreshold = Math.max(16, MP_TELEPORT_CAST_DISTANCE_UNITS * scale);
+  const myMapped = mapMultiplayerArenaPointToCanvas(snapshot, snapshot?.myPosition);
+  const oppMapped = mapMultiplayerArenaPointToCanvas(snapshot, snapshot?.opponentPosition);
+  if (multiplayerArenaBridgeState.lastMyMappedPos && myMapped) {
+    const jump = distance(
+      multiplayerArenaBridgeState.lastMyMappedPos.x,
+      multiplayerArenaBridgeState.lastMyMappedPos.y,
+      myMapped.x,
+      myMapped.y
+    );
+    if (jump > jumpThreshold && !myCharge) {
+      triggerArenaCastForPlayer(snapshot, myNumber);
+      const blinkStyle = getAbilityFeedbackPalette('blink', 'cast');
+      spawnBurst(multiplayerArenaBridgeState.lastMyMappedPos.x, multiplayerArenaBridgeState.lastMyMappedPos.y, 'rgba(186,156,255,0.85)', 10, 95);
+      spawnBurst(myMapped.x, myMapped.y, blinkStyle.burst, 14, 130);
+      pushCombatImpactWave(myMapped.x, myMapped.y, {
+        color: blinkStyle.color,
+        duration: 0.22,
+        startRadius: 18,
+        endRadius: 68,
+        alpha: 0.58,
+        fillAlpha: 0.15,
+        width: 2.6,
+      });
+      triggerCombatScreenShake(0.14, 0.09);
+    }
+  }
+  if (multiplayerArenaBridgeState.lastOppMappedPos && oppMapped) {
+    const jump = distance(
+      multiplayerArenaBridgeState.lastOppMappedPos.x,
+      multiplayerArenaBridgeState.lastOppMappedPos.y,
+      oppMapped.x,
+      oppMapped.y
+    );
+    if (jump > jumpThreshold && !oppCharge) {
+      triggerArenaCastForPlayer(snapshot, oppNumber);
+      const blinkStyle = getAbilityFeedbackPalette('blink', 'cast');
+      spawnBurst(multiplayerArenaBridgeState.lastOppMappedPos.x, multiplayerArenaBridgeState.lastOppMappedPos.y, 'rgba(186,156,255,0.85)', 10, 95);
+      spawnBurst(oppMapped.x, oppMapped.y, blinkStyle.burst, 14, 130);
+      pushCombatImpactWave(oppMapped.x, oppMapped.y, {
+        color: blinkStyle.color,
+        duration: 0.22,
+        startRadius: 18,
+        endRadius: 68,
+        alpha: 0.58,
+        fillAlpha: 0.15,
+        width: 2.6,
+      });
+      triggerCombatScreenShake(0.14, 0.09);
+    }
+  }
+  multiplayerArenaBridgeState.lastMyMappedPos = myMapped;
+  multiplayerArenaBridgeState.lastOppMappedPos = oppMapped;
+}
+
+function syncMultiplayerArenaEmbodiment() {
+  const snapshot = getMultiplayerArenaRuntimeSnapshot();
+  if (!isMultiplayerArenaRuntimeActive(snapshot)) {
+    if (multiplayerArenaBridgeState.active) {
+      multiplayerArenaBridgeState.active = false;
+      resetMultiplayerArenaBridgeTransientState();
+    }
+    return false;
+  }
+
+  multiplayerArenaBridgeState.active = true;
+  const currentMatchId = String(snapshot?.matchId || '').trim();
+  if (
+    currentMatchId &&
+    multiplayerArenaBridgeState.lastMatchId &&
+    multiplayerArenaBridgeState.lastMatchId !== currentMatchId
+  ) {
+    resetMultiplayerArenaBridgeTransientState({ preserveMatchIdentity: true });
+  }
+  if (currentMatchId) {
+    multiplayerArenaBridgeState.lastMatchId = currentMatchId;
+  }
+
+  const roundPhase = String(snapshot?.matchPhase || '').trim().toLowerCase();
+  if (
+    roundPhase &&
+    multiplayerArenaBridgeState.lastRoundPhase &&
+    roundPhase !== multiplayerArenaBridgeState.lastRoundPhase &&
+    (roundPhase === 'combat_countdown' || roundPhase === 'draft')
+  ) {
+    resetMultiplayerArenaBridgeTransientState({ preserveMatchIdentity: true });
+  }
+  multiplayerArenaBridgeState.lastRoundPhase = roundPhase;
+
+  arena.radius = Math.max(1, Number(arena.baseRadius) || Number(arena.radius) || 1);
+  arena.shrinkTimer = arena.shrinkInterval;
+
+  syncMultiplayerArenaActors(snapshot);
+  syncMultiplayerArenaFeedback(snapshot);
+  syncMultiplayerArenaCollections(snapshot);
+  return true;
+}
+
 function update(dt) {
   updateMusic(dt);
+  const multiplayerDraftSnapshot = getMultiplayerDraftPresentationSnapshot();
 
-  if (gameState !== 'draft') {
+  if (gameState !== 'draft' && !multiplayerDraftSnapshot) {
     stopDraftSpellHoverSound();
   }
 
-  if (gameState === 'draft') {
+  if (syncMultiplayerArenaEmbodiment()) {
+    updateTransientCombatVisuals(dt);
+    updateCombatFeedback(dt);
+    updateHud();
+    return;
+  }
+
+  if (gameState === 'draft' || multiplayerDraftSnapshot) {
     if (!menuOpen || draftState.complete) {
       updateDraftPhase(dt);
     } else {
       stopDraftSpellHoverSound();
     }
+    updateTransientCombatVisuals(dt);
+    updateCombatFeedback(dt);
     updateHud();
     return;
   }
 
   if (gameState === 'lobby' || menuOpen) {
+    updateTransientCombatVisuals(dt);
+    updateCombatFeedback(dt);
     updateHud();
     return;
   }
@@ -2505,20 +3685,8 @@ function update(dt) {
     }
   }
 
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
-    p.life -= dt;
-    if (p.life <= 0) particles.splice(i, 1);
-  }
+  updateTransientCombatVisuals(dt);
 
-  for (let i = damageTexts.length - 1; i >= 0; i--) {
-    const d = damageTexts[i];
-    d.y += d.vy * dt;
-    d.life -= dt;
-    if (d.life <= 0) damageTexts.splice(i, 1);
-  }
-
+  updateCombatFeedback(dt);
   updateHud();
 }

@@ -327,6 +327,77 @@ function drawLavaCracks(time, preset) {
   ctx.restore();
 }
 
+function isMultiplayerDraftVisualPhase() {
+  const api = window.outraMultiplayer;
+  if (!api || typeof api.getPresentationSnapshot !== 'function') return false;
+  const snapshot = api.getPresentationSnapshot();
+  return !!(snapshot && snapshot.active && snapshot.isDraftActive);
+}
+
+function getMultiplayerArenaRuntimeVisualState() {
+  const api = window.outraMultiplayer;
+  if (!api || typeof api.getRuntimeSnapshot !== 'function') return null;
+  const snapshot = api.getRuntimeSnapshot();
+  if (!snapshot || snapshot.active !== true || !snapshot.isArenaActive) return null;
+  return snapshot;
+}
+
+function drawMultiplayerArenaHazardHint() {
+  const snapshot = getMultiplayerArenaRuntimeVisualState();
+  if (!snapshot) return;
+
+  const boundary = snapshot.arenaBoundary && typeof snapshot.arenaBoundary === 'object'
+    ? snapshot.arenaBoundary
+    : { center: { x: 0, y: 0 }, radius: 12 };
+  const center = boundary.center && typeof boundary.center === 'object'
+    ? boundary.center
+    : { x: 0, y: 0 };
+  const boundaryRadius = Math.max(0.01, Number(boundary.radius) || 12);
+  const scale = Math.max(1, Number(arena.radius) || Number(arena.baseRadius) || 1) / boundaryRadius;
+  const cx = arena.cx + (Number(center.x) || 0) * scale;
+  const cy = arena.cy + (Number(center.y) || 0) * scale;
+  const radiusPx = boundaryRadius * scale;
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.0044);
+
+  ctx.save();
+  ctx.strokeStyle = `rgba(255, 158, 78, ${0.28 + pulse * 0.16})`;
+  ctx.lineWidth = 3.2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(255, 228, 166, ${0.14 + pulse * 0.10})`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(0, radiusPx - 8), 0, Math.PI * 2);
+  ctx.stroke();
+
+  const players = [
+    { pos: snapshot.myPosition, color: '255,122,88' },
+    { pos: snapshot.opponentPosition, color: '122,194,255' },
+  ];
+  for (const entry of players) {
+    const pos = entry.pos && typeof entry.pos === 'object' ? entry.pos : null;
+    if (!pos) continue;
+    const px = cx + ((Number(pos.x) || 0) - (Number(center.x) || 0)) * scale;
+    const py = cy + ((Number(pos.y) || 0) - (Number(center.y) || 0)) * scale;
+    const dist = Math.hypot(px - cx, py - cy);
+    const ratio = dist / Math.max(1, radiusPx);
+    if (ratio < 0.76) continue;
+
+    const warn = Math.max(0, Math.min(1, (ratio - 0.76) / 0.24));
+    const haloRadius = 22 + warn * 14 + pulse * 2;
+    const halo = ctx.createRadialGradient(px, py, 0, px, py, haloRadius);
+    halo.addColorStop(0, `rgba(${entry.color}, ${0.14 + warn * 0.24})`);
+    halo.addColorStop(1, `rgba(${entry.color}, 0)`);
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(px, py, haloRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawLavaEdgeGlow(time, preset) {
   const glowR = arena.radius + 14 + Math.sin(time * 2.1) * 1.5;
 
@@ -531,9 +602,31 @@ function drawNameTag(actor) {
   ctx.textAlign = 'left';
 }
 
+function drawActorReadabilityRing(actor, color, alpha = 0.82) {
+  ctx.save();
+  ctx.strokeStyle = `rgba(${color}, ${alpha})`;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(actor.x, actor.y, actor.r + 5, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(${color}, ${Math.max(0, alpha - 0.46)})`;
+  ctx.lineWidth = 5.5;
+  ctx.beginPath();
+  ctx.arc(actor.x, actor.y, actor.r + 9, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawPlayer() {
+  const multiplayerArena = !!getMultiplayerArenaRuntimeVisualState();
+
   // Arena character rendering is 3D-only; keep HUD overlays on canvas.
-  drawHealthBar(player, '#62f36d');
+  if (!multiplayerArena) {
+    drawHealthBar(player, '#62f36d');
+  } else {
+    drawActorReadabilityRing(player, '110, 228, 255', 0.72);
+  }
   drawNameTag(player);
 
   const now = performance.now() / 1000;
@@ -567,12 +660,58 @@ function drawPlayer() {
     ctx.fill();
     ctx.restore();
   }
+
+  const hitFlashLife = Math.max(0, Number(getActorHitFlash('player')) || 0);
+  if (hitFlashLife > 0) {
+    const flashBaseDuration = (
+      typeof COMBAT_FEEL !== 'undefined'
+      && Number.isFinite(Number(COMBAT_FEEL.hitFlashDuration))
+    )
+      ? Number(COMBAT_FEEL.hitFlashDuration)
+      : 0.16;
+    const alpha = Math.min(1, hitFlashLife / Math.max(0.001, flashBaseDuration));
+    ctx.save();
+    ctx.fillStyle = `rgba(255, 186, 160, ${0.16 + alpha * 0.2})`;
+    ctx.strokeStyle = `rgba(255, 208, 188, ${0.48 + alpha * 0.4})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.r + 11 + ((1 - alpha) * 3), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawDummy() {
+  const multiplayerArena = !!getMultiplayerArenaRuntimeVisualState();
+
   // Arena dummy rendering is 3D-only; keep HUD overlays on canvas.
-  drawHealthBar(dummy, '#ff8c5a');
+  if (!multiplayerArena) {
+    drawHealthBar(dummy, '#ff8c5a');
+  } else {
+    drawActorReadabilityRing(dummy, '255, 170, 108', 0.68);
+  }
   drawNameTag(dummy);
+
+  const hitFlashLife = Math.max(0, Number(getActorHitFlash('dummy')) || 0);
+  if (hitFlashLife > 0) {
+    const flashBaseDuration = (
+      typeof COMBAT_FEEL !== 'undefined'
+      && Number.isFinite(Number(COMBAT_FEEL.hitFlashDuration))
+    )
+      ? Number(COMBAT_FEEL.hitFlashDuration)
+      : 0.16;
+    const alpha = Math.min(1, hitFlashLife / Math.max(0.001, flashBaseDuration));
+    ctx.save();
+    ctx.fillStyle = `rgba(255, 186, 160, ${0.16 + alpha * 0.2})`;
+    ctx.strokeStyle = `rgba(255, 208, 188, ${0.48 + alpha * 0.4})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(dummy.x, dummy.y, dummy.r + 11 + ((1 - alpha) * 3), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 // ── Projectiles ───────────────────────────────────────────────
@@ -621,6 +760,91 @@ function drawParticles() {
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+}
+
+function drawCombatImpactWaves() {
+  const waves = Array.isArray(combatFx?.impactWaves) ? combatFx.impactWaves : [];
+  const directional = Array.isArray(combatFx?.directionalWaves) ? combatFx.directionalWaves : [];
+  if (!waves.length && !directional.length) return;
+
+  ctx.save();
+  ctx.lineCap = 'round';
+
+  for (const wave of waves) {
+    const lifeRatio = wave.maxLife > 0 ? Math.max(0, wave.life / wave.maxLife) : 0;
+    if (lifeRatio <= 0) continue;
+    const t = 1 - lifeRatio;
+    const radius = (Number(wave.startRadius) || 0) + ((Number(wave.endRadius) || 0) - (Number(wave.startRadius) || 0)) * t;
+    const alpha = (Number(wave.alpha) || 0.5) * lifeRatio;
+    const fillAlpha = (Number(wave.fillAlpha) || 0.14) * lifeRatio;
+    const color = String(wave.color || '255,210,166');
+
+    ctx.strokeStyle = `rgba(${color}, ${alpha})`;
+    ctx.lineWidth = Math.max(1, Number(wave.width) || 2.4);
+    ctx.beginPath();
+    ctx.arc(Number(wave.x) || 0, Number(wave.y) || 0, Math.max(1, radius), 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (fillAlpha > 0.01) {
+      ctx.fillStyle = `rgba(${color}, ${fillAlpha})`;
+      ctx.beginPath();
+      ctx.arc(Number(wave.x) || 0, Number(wave.y) || 0, Math.max(1, radius * 0.72), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  for (const wave of directional) {
+    const lifeRatio = wave.maxLife > 0 ? Math.max(0, wave.life / wave.maxLife) : 0;
+    if (lifeRatio <= 0) continue;
+    const t = 1 - lifeRatio;
+    const centerX = (Number(wave.x) || 0) + (Number(wave.dx) || 0) * (Number(wave.travel) || 80) * t;
+    const centerY = (Number(wave.y) || 0) + (Number(wave.dy) || 0) * (Number(wave.travel) || 80) * t;
+    const sideX = -(Number(wave.dy) || 0);
+    const sideY = Number(wave.dx) || 0;
+    const spread = (Number(wave.spread) || 20) * (0.6 + t * 0.75);
+    const halfLen = (Number(wave.spread) || 20) * (0.55 + t * 0.65);
+    const alpha = (Number(wave.alpha) || 0.5) * lifeRatio;
+    const color = String(wave.color || '184,220,255');
+
+    ctx.strokeStyle = `rgba(${color}, ${alpha})`;
+    ctx.lineWidth = Math.max(1, Number(wave.width) || 2.2);
+    ctx.beginPath();
+    ctx.moveTo(centerX - (Number(wave.dx) || 0) * halfLen - sideX * spread, centerY - (Number(wave.dy) || 0) * halfLen - sideY * spread);
+    ctx.lineTo(centerX + (Number(wave.dx) || 0) * halfLen, centerY + (Number(wave.dy) || 0) * halfLen);
+    ctx.lineTo(centerX - (Number(wave.dx) || 0) * halfLen + sideX * spread, centerY - (Number(wave.dy) || 0) * halfLen + sideY * spread);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawEliminationPulse() {
+  const pulse = combatFx?.eliminationPulse;
+  if (!pulse || (Number(pulse.life) || 0) <= 0) return;
+
+  const life = Math.max(0, Number(pulse.life) || 0);
+  const maxLife = Math.max(0.0001, Number(pulse.maxLife) || 0.001);
+  const t = 1 - (life / maxLife);
+  const radius = 120 + (220 * t);
+  const alpha = Math.max(0, (1 - t) * 0.36);
+
+  ctx.save();
+  const grad = ctx.createRadialGradient(
+    Number(pulse.x) || 0,
+    Number(pulse.y) || 0,
+    0,
+    Number(pulse.x) || 0,
+    Number(pulse.y) || 0,
+    radius
+  );
+  grad.addColorStop(0, `rgba(255, 196, 124, ${alpha})`);
+  grad.addColorStop(0.5, `rgba(255, 148, 106, ${alpha * 0.56})`);
+  grad.addColorStop(1, 'rgba(255, 126, 92, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(Number(pulse.x) || 0, Number(pulse.y) || 0, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 // ── Skill Aim Preview ─────────────────────────────────────────
@@ -1065,7 +1289,24 @@ function render() {
   bgCtx.clearRect(0, 0, canvas.width, canvas.height);
   fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
 
-  if (gameState === 'draft') {
+  const shouldRenderDraft = gameState === 'draft' || isMultiplayerDraftVisualPhase();
+  const multiplayerArenaActive = !!getMultiplayerArenaRuntimeVisualState();
+  const shouldShake = !shouldRenderDraft && (gameState === 'playing' || gameState === 'result' || multiplayerArenaActive);
+  const shakeOffset = shouldShake && typeof getCombatScreenShakeOffset === 'function'
+    ? getCombatScreenShakeOffset()
+    : { x: 0, y: 0 };
+  const shakeX = Number(shakeOffset?.x) || 0;
+  const shakeY = Number(shakeOffset?.y) || 0;
+  const hasShake = Math.abs(shakeX) > 0.01 || Math.abs(shakeY) > 0.01;
+
+  if (hasShake) {
+    bgCtx.save();
+    bgCtx.translate(shakeX, shakeY);
+    fxCtx.save();
+    fxCtx.translate(shakeX, shakeY);
+  }
+
+  if (shouldRenderDraft) {
     const hasDraft3DPlatform =
       window.outraThree &&
       typeof window.outraThree.isDraftPlatformRenderedIn3D === 'function' &&
@@ -1080,12 +1321,18 @@ function render() {
     }
 
     ctx = bgCtx;
+    if (hasShake) {
+      fxCtx.restore();
+      bgCtx.restore();
+    }
     return;
   }
 
   // Background canvas: arena / lava only
   ctx = bgCtx;
   drawArena();
+  drawMultiplayerArenaHazardHint();
+  drawEliminationPulse();
 
   // 3D floor renders in the middle via threeLayer
 
@@ -1099,6 +1346,7 @@ function render() {
   drawProjectiles();
   if (dummyEnabled && dummy.alive) drawDummy();
   drawPlayer();
+  drawCombatImpactWaves();
   drawSkillAimPreview();
   drawDamageTexts();
   drawCrosshair();
@@ -1106,6 +1354,10 @@ function render() {
   drawResultOverlay();
 
   // Restore default drawing context
+  if (hasShake) {
+    fxCtx.restore();
+    bgCtx.restore();
+  }
   ctx = bgCtx;
 }
 

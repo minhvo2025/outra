@@ -303,6 +303,226 @@ const draftEmoteHideTimers = {
   B: 0,
 };
 let draftEmoteBindingsReady = false;
+let draftSpellPoolBuilt = false;
+const draftSpellPoolButtons = new Map();
+const draftSpellRecentPickAt = new Map();
+const draftUiSpellFxState = {
+  initialized: false,
+  prevPicks: {
+    A: [],
+    B: [],
+  },
+  lastActivePlayerId: '',
+  hoverSpellId: '',
+  hoverStartedAt: 0,
+  pendingSpellId: '',
+  pendingPlayerId: '',
+  pendingStartedAt: 0,
+};
+
+const MP_ABILITY_TO_UI_SPELL = Object.freeze({
+  fireblast: 'fire',
+  blink: 'blink',
+  shield: 'shield',
+  gust: 'gust',
+  charge: 'charge',
+  shock: 'shock',
+  wall: 'wall',
+  rewind: 'rewind',
+  hook: 'hook',
+});
+
+function getMultiplayerPresentationSnapshot() {
+  const api = window.outraMultiplayer;
+  if (!api || typeof api.getPresentationSnapshot !== 'function') return null;
+  const snapshot = api.getPresentationSnapshot();
+  if (!snapshot || snapshot.active !== true) return null;
+  return snapshot;
+}
+
+function toUiSpellFromMultiplayer(spellOrAbilityId) {
+  const normalized = String(spellOrAbilityId || '').trim().toLowerCase();
+  if (!normalized) return '';
+  return MP_ABILITY_TO_UI_SPELL[normalized] || normalized;
+}
+
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function normalizeDraftPlayerId(playerId) {
+  return String(playerId || '').trim().toUpperCase() === 'B' ? 'B' : 'A';
+}
+
+function clearDraftUiSpellFxState() {
+  draftUiSpellFxState.initialized = false;
+  draftUiSpellFxState.prevPicks.A = [];
+  draftUiSpellFxState.prevPicks.B = [];
+  draftUiSpellFxState.lastActivePlayerId = '';
+  draftUiSpellFxState.hoverSpellId = '';
+  draftUiSpellFxState.hoverStartedAt = 0;
+  draftUiSpellFxState.pendingSpellId = '';
+  draftUiSpellFxState.pendingPlayerId = '';
+  draftUiSpellFxState.pendingStartedAt = 0;
+  draftSpellRecentPickAt.clear();
+  draftState.holdSpellId = null;
+  draftState.holdTime = 0;
+}
+
+function queueDraftPickFxFromSync(playerId, slotIndex, spellId) {
+  if (typeof queueDraftPickConfirmationFx !== 'function') return;
+  const normalizedPlayerId = normalizeDraftPlayerId(playerId);
+  const normalizedSpellId = toUiSpellFromMultiplayer(spellId);
+  if (!normalizedSpellId) return;
+  queueDraftPickConfirmationFx(normalizedSpellId, normalizedPlayerId, slotIndex);
+  draftSpellRecentPickAt.set(normalizedSpellId, performance.now());
+}
+
+function syncDraftVisualRuntimeFromSnapshot(order, picksA, picksB, spellPool) {
+  const spellOrder = Array.isArray(draftState.spellOrder) && draftState.spellOrder.length
+    ? draftState.spellOrder.map((spellId) => toUiSpellFromMultiplayer(spellId)).filter(Boolean)
+    : ['hook', 'blink', 'shield', 'charge', 'shock', 'gust', 'wall', 'rewind'];
+  const picksByPlayer = {
+    A: Array.isArray(picksA) ? picksA : [],
+    B: Array.isArray(picksB) ? picksB : [],
+  };
+  const pickedByPlayerCounts = {
+    A: {},
+    B: {},
+  };
+
+  for (const playerId of DRAFT_PLAYER_IDS) {
+    for (const spellId of picksByPlayer[playerId]) {
+      const normalizedSpellId = toUiSpellFromMultiplayer(spellId);
+      if (!normalizedSpellId) continue;
+      pickedByPlayerCounts[playerId][normalizedSpellId] = (pickedByPlayerCounts[playerId][normalizedSpellId] || 0) + 1;
+    }
+  }
+
+  draftState.order = Array.isArray(order) && order.length ? order.slice() : ['A', 'B', 'B', 'A', 'A', 'B'];
+  draftState.spells = spellOrder.map((spellId) => {
+    const entry = spellPool && typeof spellPool === 'object' ? spellPool[spellId] : null;
+    const remainingCopies = Number(entry?.remainingCopies);
+    const totalCopies = Number(entry?.totalCopies);
+    const remaining = Number.isFinite(remainingCopies) ? Math.max(0, remainingCopies) : 0;
+    const total = Number.isFinite(totalCopies) ? Math.max(remaining, totalCopies) : remaining;
+    const countA = Number(pickedByPlayerCounts.A[spellId]) || 0;
+    const countB = Number(pickedByPlayerCounts.B[spellId]) || 0;
+    const takenBy = countA > countB ? 'A' : countB > countA ? 'B' : countA > 0 ? (draftUiSpellFxState.pendingPlayerId || '') : null;
+    return {
+      id: spellId,
+      label: typeof getDraftSpellLabel === 'function' ? (getDraftSpellLabel(spellId) || spellId.toUpperCase()) : spellId.toUpperCase(),
+      takenBy,
+      disabled: remaining <= 0,
+      remainingCopies: remaining,
+      totalCopies: total,
+    };
+  });
+
+  if (typeof buildDraftLayout === 'function') {
+    draftState.layout = buildDraftLayout();
+  }
+
+  const seats = draftState.layout?.seats || {};
+  for (const playerId of DRAFT_PLAYER_IDS) {
+    const seat = seats[playerId];
+    if (!seat) continue;
+    if (!draftState.players[playerId]) {
+      draftState.players[playerId] = { x: seat.x, y: seat.y, vx: 0, vy: 0, moveTimer: 0, dirX: 0, dirY: 0 };
+    }
+    draftState.players[playerId].x = seat.x;
+    draftState.players[playerId].y = seat.y;
+    draftState.players[playerId].vx = 0;
+    draftState.players[playerId].vy = 0;
+    draftState.players[playerId].moveTimer = 0;
+    draftState.players[playerId].dirX = 0;
+    draftState.players[playerId].dirY = 0;
+  }
+}
+
+function syncDraftStateFromMultiplayer(multiplayerSnapshot) {
+  const draft = multiplayerSnapshot?.draft;
+  if (!draft || typeof draft !== 'object') return;
+
+  const order = Array.isArray(draft.order) && draft.order.length
+    ? draft.order.map((playerId) => normalizeDraftPlayerId(playerId))
+    : ['A', 'B', 'B', 'A', 'A', 'B'];
+  const activeIndexRaw = Number(draft.activeIndex);
+  const activeIndex = Number.isFinite(activeIndexRaw)
+    ? clampNumber(activeIndexRaw, 0, Math.max(0, order.length - 1))
+    : 0;
+
+  const rawPicksA = Array.isArray(draft.picks?.A) ? draft.picks.A : [];
+  const rawPicksB = Array.isArray(draft.picks?.B) ? draft.picks.B : [];
+  const picksA = rawPicksA.map((spellId) => toUiSpellFromMultiplayer(spellId)).filter(Boolean);
+  const picksB = rawPicksB.map((spellId) => toUiSpellFromMultiplayer(spellId)).filter(Boolean);
+  const mappedLocalPlayerId = normalizeDraftPlayerId(draft.localPlayerId || 'A');
+  const mappedNames = {
+    A: String(draft.playerNames?.A || '').trim(),
+    B: String(draft.playerNames?.B || '').trim()
+  };
+  const spellPool = draft.spellPool && typeof draft.spellPool === 'object'
+    ? draft.spellPool
+    : {};
+
+  draftState.order = order;
+  draftState.activeIndex = activeIndex;
+  draftState.turnIndex = activeIndex;
+  draftState.localPlayerId = mappedLocalPlayerId;
+  draftState.complete = !!draft.complete;
+  draftState.turnDuration = Math.max(0, Number(draft.turnDurationSeconds) || draftState.turnDuration || 0);
+  draftState.timeLeft = Math.max(0, Number(draft.timeLeftSeconds) || 0);
+  draftState.turnTimeLeft = draftState.timeLeft;
+  draftState.holdDuration = Math.max(0.36, Number(draftState.holdDuration) || 0.6);
+  draftState.picks = {
+    A: picksA.slice(0, 3),
+    B: picksB.slice(0, 3)
+  };
+  draftState.playerNames = mappedNames;
+  draftState.spellPool = spellPool;
+  syncDraftVisualRuntimeFromSnapshot(order, picksA, picksB, spellPool);
+
+  const activePlayerId = order[activeIndex] || null;
+  if (!draftUiSpellFxState.initialized) {
+    draftUiSpellFxState.prevPicks.A = picksA.slice();
+    draftUiSpellFxState.prevPicks.B = picksB.slice();
+    draftUiSpellFxState.lastActivePlayerId = activePlayerId || '';
+    draftUiSpellFxState.initialized = true;
+    return;
+  }
+
+  for (const playerId of DRAFT_PLAYER_IDS) {
+    const previousPicks = Array.isArray(draftUiSpellFxState.prevPicks[playerId]) ? draftUiSpellFxState.prevPicks[playerId] : [];
+    const nextPicks = playerId === 'A' ? picksA : picksB;
+    const maxLength = Math.max(previousPicks.length, nextPicks.length);
+    for (let index = 0; index < maxLength; index += 1) {
+      const prevSpellId = toUiSpellFromMultiplayer(previousPicks[index]);
+      const nextSpellId = toUiSpellFromMultiplayer(nextPicks[index]);
+      if (!nextSpellId || prevSpellId === nextSpellId) continue;
+      queueDraftPickFxFromSync(playerId, index, nextSpellId);
+      if (
+        draftUiSpellFxState.pendingSpellId
+        && draftUiSpellFxState.pendingPlayerId === playerId
+        && draftUiSpellFxState.pendingSpellId === nextSpellId
+      ) {
+        draftUiSpellFxState.pendingSpellId = '';
+        draftUiSpellFxState.pendingPlayerId = '';
+        draftUiSpellFxState.pendingStartedAt = 0;
+      }
+    }
+  }
+
+  if (
+    draftUiSpellFxState.lastActivePlayerId !== activePlayerId
+    && typeof queueDraftTurnFlash === 'function'
+    && activePlayerId
+  ) {
+    queueDraftTurnFlash(activePlayerId);
+  }
+  draftUiSpellFxState.lastActivePlayerId = activePlayerId || '';
+  draftUiSpellFxState.prevPicks.A = picksA.slice();
+  draftUiSpellFxState.prevPicks.B = picksB.slice();
+}
 
 function ensureDraftOrderUi() {
   if (!draftOrderListEl) return;
@@ -418,7 +638,9 @@ function ensureDraftEmoteBindings() {
     const raw = btn.getAttribute('data-draft-emote-btn') || '';
     const [playerId, emoteKey] = raw.split(':');
     if (!playerId || !emoteKey) return;
-    if (gameState !== 'draft') return;
+    const mpSnapshot = getMultiplayerPresentationSnapshot();
+    const draftActive = gameState === 'draft' || !!mpSnapshot?.isDraftActive;
+    if (!draftActive) return;
     if (!isDraftEmoteUnlocked(emoteKey)) return;
 
     showDraftEmoteToast(playerId, emoteKey);
@@ -638,14 +860,256 @@ function renderDraftPlayerPanel(playerId, activePlayer, activeIndex, order, isCo
   }
 }
 
-function updateDraftOverlayUi() {
-  if (!draftOverlay) return;
+function getDraftSpellPoolEntry(spellId) {
+  const normalizedId = String(spellId || '').trim().toLowerCase();
+  if (!normalizedId) return null;
+  const pool = draftState.spellPool && typeof draftState.spellPool === 'object'
+    ? draftState.spellPool
+    : {};
+  const entry = pool[normalizedId];
+  if (!entry || typeof entry !== 'object') return null;
+  const remainingCopies = Number(entry.remainingCopies);
+  const totalCopies = Number(entry.totalCopies);
+  const remaining = Number.isFinite(remainingCopies) ? Math.max(0, remainingCopies) : 0;
+  const total = Number.isFinite(totalCopies) ? Math.max(remaining, totalCopies) : remaining;
+  return {
+    id: normalizedId,
+    remainingCopies: remaining,
+    totalCopies: total
+  };
+}
 
-  const isDraft = gameState === 'draft';
+function requestMultiplayerDraftPick(spellId) {
+  const api = window.outraMultiplayer;
+  if (!api || typeof api.requestDraftPick !== 'function') return false;
+  const normalizedSpellId = toUiSpellFromMultiplayer(spellId);
+  const localPlayerId = normalizeDraftPlayerId(draftState.localPlayerId || 'A');
+  if (normalizedSpellId) {
+    draftUiSpellFxState.pendingSpellId = normalizedSpellId;
+    draftUiSpellFxState.pendingPlayerId = localPlayerId;
+    draftUiSpellFxState.pendingStartedAt = performance.now();
+    draftUiSpellFxState.hoverSpellId = normalizedSpellId;
+    draftUiSpellFxState.hoverStartedAt = performance.now();
+  }
+  api.requestDraftPick(spellId);
+  return true;
+}
+
+function renderDraftSpellPoolUi({ isDraft, isComplete, activePlayer, localPlayerId, multiplayerSnapshot }) {
+  if (!draftSpellPoolDockEl || !draftSpellPoolGridEl) return;
+  const isMultiplayerDraft = !!(multiplayerSnapshot && multiplayerSnapshot.isDraftActive);
+  const showPool = isDraft && isMultiplayerDraft;
+
+  draftSpellPoolDockEl.classList.toggle('show', showPool);
+  draftSpellPoolDockEl.setAttribute('aria-hidden', showPool ? 'false' : 'true');
+  if (!showPool) {
+    draftSpellPoolDockEl.classList.remove('is-local-turn', 'is-opponent-turn');
+    if (isMultiplayerDraft || !!multiplayerSnapshot?.active) {
+      draftState.holdSpellId = null;
+      draftState.holdTime = 0;
+    }
+    return;
+  }
+
+  const canPickNow = !isComplete && activePlayer === localPlayerId;
+  const nowMs = performance.now();
+  const myPicks = new Set(
+    (Array.isArray(draftState.picks?.[localPlayerId]) ? draftState.picks[localPlayerId] : [])
+      .map((spellId) => String(spellId || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const picksA = Array.isArray(draftState.picks?.A) ? draftState.picks.A : [];
+  const picksB = Array.isArray(draftState.picks?.B) ? draftState.picks.B : [];
+  const pickCountBySpellA = {};
+  const pickCountBySpellB = {};
+  picksA.forEach((spellId) => {
+    const normalized = toUiSpellFromMultiplayer(spellId);
+    if (!normalized) return;
+    pickCountBySpellA[normalized] = (pickCountBySpellA[normalized] || 0) + 1;
+  });
+  picksB.forEach((spellId) => {
+    const normalized = toUiSpellFromMultiplayer(spellId);
+    if (!normalized) return;
+    pickCountBySpellB[normalized] = (pickCountBySpellB[normalized] || 0) + 1;
+  });
+
+  const spellOrder = Array.isArray(draftState.spellOrder) && draftState.spellOrder.length
+    ? draftState.spellOrder
+    : ['hook', 'blink', 'shield', 'charge', 'shock', 'gust', 'wall', 'rewind'];
+  const normalizedOrder = spellOrder
+    .map((spellId) => toUiSpellFromMultiplayer(spellId))
+    .filter(Boolean);
+
+  const signature = normalizedOrder.join('|');
+  if (!draftSpellPoolBuilt || draftSpellPoolGridEl.dataset.signature !== signature) {
+    draftSpellPoolGridEl.innerHTML = '';
+    draftSpellPoolButtons.clear();
+    normalizedOrder.forEach((spellId) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'draftSpellPoolBtn';
+      button.dataset.spellId = spellId;
+      button.innerHTML = `
+        <span class="draftSpellPoolOrb" aria-hidden="true">
+          <span class="draftSpellPoolOrbGlow"></span>
+          <span class="draftSpellPoolOrbCore">
+            <img class="draftSpellPoolOrbIcon" alt="${escapeHtml(getDraftUiSpellLabel(spellId))}" decoding="async" loading="lazy" />
+            <span class="draftSpellPoolOrbFallback">${escapeHtml((SPELL_DEFS[spellId] && SPELL_DEFS[spellId].icon) ? SPELL_DEFS[spellId].icon : '✦')}</span>
+          </span>
+          <span class="draftSpellPoolChannelRing"></span>
+        </span>
+        <span class="draftSpellPoolBtnMeta">
+          <span class="draftSpellPoolBtnName">${escapeHtml(getDraftUiSpellLabel(spellId))}</span>
+          <span class="draftSpellPoolBtnCount">0/0 copies</span>
+        </span>
+        <span class="draftSpellPoolBtnOwner" aria-hidden="true"></span>
+      `;
+      button.addEventListener('mouseenter', () => {
+        draftUiSpellFxState.hoverSpellId = spellId;
+        draftUiSpellFxState.hoverStartedAt = performance.now();
+      });
+      button.addEventListener('mouseleave', () => {
+        if (draftUiSpellFxState.hoverSpellId !== spellId) return;
+        draftUiSpellFxState.hoverSpellId = '';
+        draftUiSpellFxState.hoverStartedAt = 0;
+      });
+      button.addEventListener('focus', () => {
+        draftUiSpellFxState.hoverSpellId = spellId;
+        draftUiSpellFxState.hoverStartedAt = performance.now();
+      });
+      button.addEventListener('blur', () => {
+        if (draftUiSpellFxState.hoverSpellId !== spellId) return;
+        draftUiSpellFxState.hoverSpellId = '';
+        draftUiSpellFxState.hoverStartedAt = 0;
+      });
+      button.addEventListener('click', () => {
+        requestMultiplayerDraftPick(spellId);
+      });
+      draftSpellPoolButtons.set(spellId, button);
+      draftSpellPoolGridEl.appendChild(button);
+
+      const orbIconEl = button.querySelector('.draftSpellPoolOrbIcon');
+      const orbFallbackEl = button.querySelector('.draftSpellPoolOrbFallback');
+      const iconPath = getDraftUiSpellIconPath(spellId);
+      if (orbIconEl) {
+        if (!iconPath) {
+          orbIconEl.remove();
+          if (orbFallbackEl) orbFallbackEl.style.display = 'inline-flex';
+        } else {
+          orbIconEl.src = iconPath;
+          orbIconEl.addEventListener('error', () => {
+            orbIconEl.remove();
+            if (orbFallbackEl) orbFallbackEl.style.display = 'inline-flex';
+          }, { once: true });
+          orbIconEl.addEventListener('load', () => {
+            if (orbFallbackEl) orbFallbackEl.style.display = 'none';
+          }, { once: true });
+        }
+      }
+    });
+    draftSpellPoolBuilt = true;
+    draftSpellPoolGridEl.dataset.signature = signature;
+  }
+
+  normalizedOrder.forEach((spellId) => {
+    const button = draftSpellPoolButtons.get(spellId);
+    if (!button) return;
+    const entry = getDraftSpellPoolEntry(spellId);
+    const remaining = entry ? entry.remainingCopies : 0;
+    const total = entry ? entry.totalCopies : 0;
+    const alreadyPicked = myPicks.has(spellId);
+    const disabled = !canPickNow || remaining <= 0 || alreadyPicked;
+
+    button.disabled = disabled;
+    button.classList.toggle('is-pickable', !disabled);
+    button.classList.toggle('is-disabled', remaining <= 0);
+    button.classList.toggle('is-picked', alreadyPicked);
+    button.classList.toggle('is-active-turn', canPickNow && !disabled);
+
+    const countEl = button.querySelector('.draftSpellPoolBtnCount');
+    if (countEl) countEl.textContent = `${remaining}/${total} copies`;
+
+    const ownerEl = button.querySelector('.draftSpellPoolBtnOwner');
+    const ownerA = Number(pickCountBySpellA[spellId]) || 0;
+    const ownerB = Number(pickCountBySpellB[spellId]) || 0;
+    const ownerText = ownerA > 0 && ownerB > 0 ? 'A+B' : ownerA > 0 ? 'A' : ownerB > 0 ? 'B' : '';
+    if (ownerEl) {
+      ownerEl.textContent = ownerText;
+      ownerEl.classList.toggle('has-owner', !!ownerText);
+      ownerEl.classList.toggle('owner-a', ownerText === 'A');
+      ownerEl.classList.toggle('owner-b', ownerText === 'B');
+      ownerEl.classList.toggle('owner-ab', ownerText === 'A+B');
+    }
+
+    const recentlyPickedAt = Number(draftSpellRecentPickAt.get(spellId)) || 0;
+    const justPicked = recentlyPickedAt > 0 && (nowMs - recentlyPickedAt) <= 760;
+    button.classList.toggle('is-just-picked', justPicked);
+    if (!justPicked && recentlyPickedAt > 0) {
+      draftSpellRecentPickAt.delete(spellId);
+    }
+
+    const pendingChannel = draftUiSpellFxState.pendingSpellId === spellId
+      && (nowMs - Number(draftUiSpellFxState.pendingStartedAt || 0)) <= 900;
+    const hoverChannel = !pendingChannel
+      && draftUiSpellFxState.hoverSpellId === spellId
+      && canPickNow
+      && !disabled;
+    const isChanneling = pendingChannel || hoverChannel;
+    button.classList.toggle('is-channeling', isChanneling);
+
+    let channelRatio = 0;
+    if (pendingChannel) {
+      channelRatio = clampNumber((nowMs - Number(draftUiSpellFxState.pendingStartedAt || 0)) / 540, 0.05, 1);
+    } else if (hoverChannel) {
+      channelRatio = clampNumber((nowMs - Number(draftUiSpellFxState.hoverStartedAt || 0)) / 760, 0.08, 0.82);
+    }
+    button.style.setProperty('--draft-channel-progress', String(channelRatio.toFixed(3)));
+  });
+
+  draftSpellPoolDockEl.classList.toggle('is-local-turn', canPickNow && !isComplete);
+  draftSpellPoolDockEl.classList.toggle('is-opponent-turn', !canPickNow && !isComplete);
+
+  let channelSpellId = '';
+  let channelRatio = 0;
+  const pendingAge = nowMs - Number(draftUiSpellFxState.pendingStartedAt || 0);
+  const pendingIsFresh = !!draftUiSpellFxState.pendingSpellId && pendingAge <= 900;
+  if (pendingIsFresh) {
+    channelSpellId = draftUiSpellFxState.pendingSpellId;
+    channelRatio = clampNumber(pendingAge / 540, 0.08, 1);
+  } else if (canPickNow && draftUiSpellFxState.hoverSpellId) {
+    const hoverAge = nowMs - Number(draftUiSpellFxState.hoverStartedAt || 0);
+    channelSpellId = draftUiSpellFxState.hoverSpellId;
+    channelRatio = clampNumber(hoverAge / 760, 0.10, 0.82);
+  }
+  if (pendingAge > 1200 && draftUiSpellFxState.pendingSpellId) {
+    draftUiSpellFxState.pendingSpellId = '';
+    draftUiSpellFxState.pendingPlayerId = '';
+    draftUiSpellFxState.pendingStartedAt = 0;
+  }
+  draftState.holdSpellId = channelSpellId || null;
+  draftState.holdTime = channelSpellId
+    ? Math.max(0, Math.min(Number(draftState.holdDuration) || 0.6, (Number(draftState.holdDuration) || 0.6) * channelRatio))
+    : 0;
+}
+
+function updateDraftOverlayUi(multiplayerSnapshot = null) {
+  if (!draftOverlay) return;
+  const snapshot = multiplayerSnapshot || getMultiplayerPresentationSnapshot();
+  if (snapshot?.isDraftActive) {
+    syncDraftStateFromMultiplayer(snapshot);
+  }
+
+  const isDraft = gameState === 'draft' || !!snapshot?.isDraftActive;
   draftOverlay.classList.toggle('show', isDraft);
   draftOverlay.setAttribute('aria-hidden', isDraft ? 'false' : 'true');
   if (!isDraft) {
+    clearDraftUiSpellFxState();
     clearAllDraftEmoteToasts();
+    if (draftSpellPoolDockEl) {
+      draftSpellPoolDockEl.classList.remove('show');
+      draftSpellPoolDockEl.classList.remove('is-local-turn', 'is-opponent-turn');
+      draftSpellPoolDockEl.setAttribute('aria-hidden', 'true');
+    }
     return;
   }
 
@@ -703,7 +1167,7 @@ function updateDraftOverlayUi() {
     draftHelperTextEl.textContent = isComplete
       ? 'Starting match...'
       : (activePlayer === localPlayerId
-          ? 'Click a spell tile to lock your pick (or hold to channel-pick)'
+          ? 'Hover ~1s or click a spell to lock your pick'
           : `Waiting for Player ${activePlayer}`);
   }
 
@@ -714,6 +1178,13 @@ function updateDraftOverlayUi() {
 
   for (const playerId of DRAFT_PLAYER_IDS) {
     renderDraftPlayerPanel(playerId, activePlayer, activeIndex, order, isComplete);
+  }
+  // Spell picking now happens on the original in-room draft grid (canvas),
+  // so keep the auxiliary overlay spell-pool dock hidden.
+  if (draftSpellPoolDockEl) {
+    draftSpellPoolDockEl.classList.remove('show');
+    draftSpellPoolDockEl.classList.remove('is-local-turn', 'is-opponent-turn');
+    draftSpellPoolDockEl.setAttribute('aria-hidden', 'true');
   }
 
   if (!draftOrderListEl) return;
@@ -800,7 +1271,10 @@ function setLobbyTab(tab) {
 
 // ── Mobile Controls Visibility ────────────────────────────────
 function refreshMobileControls() {
-  const inArenaPhase = gameState === 'playing' || gameState === 'result';
+  const snapshot = getMultiplayerPresentationSnapshot();
+  const inArenaPhase = gameState === 'playing'
+    || gameState === 'result'
+    || !!snapshot?.isArenaActive;
   mobileControls.classList.toggle('show', isTouchDevice && inArenaPhase);
 }
 
@@ -1325,10 +1799,15 @@ function triggerReadyFlash(el) {
   el.classList.add('readyFlash');
 }
 
-function updateSkillCooldownButtons() {
+function updateSkillCooldownButtons(multiplayerSnapshot = null) {
+  const snapshot = multiplayerSnapshot || getMultiplayerPresentationSnapshot();
+  const multiplayerArena = snapshot?.isArenaActive ? snapshot.arena : null;
   const now = performance.now() / 1000;
   const cooldowns = {};
-  const availableSpells = new Set(activeSpellLoadout);
+  const effectiveLoadout = Array.isArray(multiplayerArena?.loadout) && multiplayerArena.loadout.length
+    ? multiplayerArena.loadout
+    : activeSpellLoadout;
+  const availableSpells = new Set(effectiveLoadout);
 
   Object.keys(skillButtons).forEach((spellId) => {
     const isAvailable = spellId === 'fire' || availableSpells.has(spellId);
@@ -1345,9 +1824,20 @@ function updateSkillCooldownButtons() {
     }
   });
 
-  activeSpellLoadout.forEach(spellId => {
+  effectiveLoadout.forEach((spellId) => {
     const def = SPELL_DEFS[spellId];
     if (!def) return;
+    if (multiplayerArena) {
+      let cooldownValue = Math.max(0, Number(multiplayerArena.cooldownSecondsBySpell?.[spellId]) || 0);
+      if (spellId === 'shield' && multiplayerArena.shieldActive) {
+        cooldownValue = Math.max(
+          cooldownValue,
+          Math.max(0, Number(multiplayerArena.shieldRemainingSeconds) || 0)
+        );
+      }
+      cooldowns[spellId] = cooldownValue;
+      return;
+    }
 
     if (spellId === 'shield' && now < player.shieldUntil) {
       cooldowns[spellId] = player.shieldUntil - now;
@@ -1424,23 +1914,48 @@ function updateSkillCooldownButtons() {
     rewind: keybinds.rewind
   };
 
-  Object.entries(keyMap).forEach(([skill, elId]) => {
-    const el = document.getElementById(elId);
-    if (el) el.textContent = prettyKey(bindMap[skill]);
-  });
+  if (multiplayerArena) {
+    const draftedSpells = effectiveLoadout.filter((spellId) => spellId !== 'fire').slice(0, 3);
+    const keyBySpell = {
+      [draftedSpells[0]]: 'Q',
+      [draftedSpells[1]]: 'E',
+      [draftedSpells[2]]: 'R'
+    };
+    Object.entries(keyMap).forEach(([skill, elId]) => {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const mappedKey = keyBySpell[skill] || '—';
+      el.textContent = mappedKey;
+    });
+    const fireKeyEl = document.querySelector('#dspell-fire .deskSpellKey');
+    if (fireKeyEl) fireKeyEl.textContent = 'Space';
+  } else {
+    Object.entries(keyMap).forEach(([skill, elId]) => {
+      const el = document.getElementById(elId);
+      if (el) el.textContent = prettyKey(bindMap[skill]);
+    });
+    const fireKeyEl = document.querySelector('#dspell-fire .deskSpellKey');
+    if (fireKeyEl) fireKeyEl.textContent = 'M1';
+  }
 }
 
-function syncArenaSpellBarLayout() {
+function syncArenaSpellBarLayout(multiplayerSnapshot = null) {
   const spellBar = document.getElementById('desktopSpellBar');
   if (!spellBar) return;
 
-  const inArenaPhase = gameState === 'playing' || gameState === 'result';
-  const isDraftLoadout = Array.isArray(activeSpellLoadout)
-    && activeSpellLoadout.includes('fire')
-    && activeSpellLoadout.length <= 4;
+  const snapshot = multiplayerSnapshot || getMultiplayerPresentationSnapshot();
+  const inArenaPhase = gameState === 'playing'
+    || gameState === 'result'
+    || !!snapshot?.isArenaActive;
+  const effectiveLoadout = Array.isArray(snapshot?.arena?.loadout) && snapshot.arena.loadout.length
+    ? snapshot.arena.loadout
+    : activeSpellLoadout;
+  const isDraftLoadout = Array.isArray(effectiveLoadout)
+    && effectiveLoadout.includes('fire')
+    && effectiveLoadout.length <= 4;
   const visibleDraftSpells = new Set(
     isDraftLoadout
-      ? activeSpellLoadout.filter((spellId) => spellId !== 'fire').slice(0, 3)
+      ? effectiveLoadout.filter((spellId) => spellId !== 'fire').slice(0, 3)
       : []
   );
 
@@ -1459,7 +1974,7 @@ function syncArenaSpellBarLayout() {
       continue;
     }
 
-    const shouldShow = spellId !== 'fire' && visibleDraftSpells.has(spellId);
+    const shouldShow = spellId === 'fire' || visibleDraftSpells.has(spellId);
     cell.style.display = shouldShow ? '' : 'none';
   }
 
@@ -1467,8 +1982,16 @@ function syncArenaSpellBarLayout() {
 }
 
 function updateHud() {
-  const inArenaPhase = gameState === 'playing' || gameState === 'result';
-  updateDraftOverlayUi();
+  const multiplayerSnapshot = getMultiplayerPresentationSnapshot();
+  const multiplayerMatchFlowActive = !!multiplayerSnapshot?.active
+    && (!!multiplayerSnapshot?.isDraftActive || !!multiplayerSnapshot?.isArenaActive);
+  if (document?.body) {
+    document.body.classList.toggle('mpMatchFlowActive', multiplayerMatchFlowActive);
+  }
+  const inArenaPhase = gameState === 'playing'
+    || gameState === 'result'
+    || !!multiplayerSnapshot?.isArenaActive;
+  updateDraftOverlayUi(multiplayerSnapshot);
 
   applySpellIconsDesktop();
 
@@ -1519,9 +2042,9 @@ function updateHud() {
 
   const spellBar = document.getElementById('desktopSpellBar');
   if (spellBar) spellBar.style.display = (inArenaPhase && !isTouchDevice) ? 'flex' : 'none';
-  syncArenaSpellBarLayout();
+  syncArenaSpellBarLayout(multiplayerSnapshot);
 
-  updateSkillCooldownButtons();
+  updateSkillCooldownButtons(multiplayerSnapshot);
 
   if (gameState === 'lobby') {
     buildRankedPanel();
