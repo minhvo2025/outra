@@ -1,47 +1,6 @@
-create extension if not exists pgcrypto;
-
-create table if not exists public.leaderboard_profiles (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null unique,
-  display_name text not null,
-  leaderboard_points int4 not null default 0,
-  wins int4 not null default 0,
-  losses int4 not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create index if not exists leaderboard_profiles_points_desc_idx
-  on public.leaderboard_profiles (leaderboard_points desc);
-
-create index if not exists leaderboard_profiles_updated_desc_idx
-  on public.leaderboard_profiles (updated_at desc);
-
-grant select, insert, update on table public.leaderboard_profiles to authenticated;
-
-alter table public.leaderboard_profiles enable row level security;
-
-drop policy if exists "Leaderboard rows readable by authenticated users" on public.leaderboard_profiles;
-create policy "Leaderboard rows readable by authenticated users"
-on public.leaderboard_profiles
-for select
-to authenticated
-using (true);
-
-drop policy if exists "Users can insert own leaderboard row" on public.leaderboard_profiles;
-create policy "Users can insert own leaderboard row"
-on public.leaderboard_profiles
-for insert
-to authenticated
-with check (auth.uid() = user_id);
-
-drop policy if exists "Users can update own leaderboard row" on public.leaderboard_profiles;
-create policy "Users can update own leaderboard row"
-on public.leaderboard_profiles
-for update
-to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
+-- Fixes RPC error:
+-- code 42702: column reference "user_id" is ambiguous
+-- Safe to run multiple times.
 
 drop function if exists public.apply_leaderboard_match_result(uuid, text, text);
 create or replace function public.apply_leaderboard_match_result(

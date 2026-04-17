@@ -788,7 +788,6 @@ const storeList = document.getElementById('storeList');
 const startBtn = document.getElementById('startBtn');
 const draftRoomBtn = document.getElementById('draftRoomBtn');
 const quickMatchStateText = document.getElementById('quickMatchStateText');
-const cancelQueueBtn = document.getElementById('cancelQueueBtn');
 
 const wlkLobbyEl = document.getElementById('wlkLobby');
 const wlkLobbyTopEl = document.getElementById('wlkLobbyTop');

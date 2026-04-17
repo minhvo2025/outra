@@ -4163,8 +4163,13 @@ body.storeOpen {
   filter: saturate(0.98) brightness(0.98);
 }
 
-.enterArenaBtn.isSearching {
-  opacity: 0.82;
+.enterArenaBtn.isSearching,
+.enterArenaBtn.isCancelMode {
+  filter:
+    brightness(1.02)
+    drop-shadow(0 0 14px rgba(255, 72, 72, 0.26))
+    drop-shadow(0 8px 18px rgba(255, 110, 110, 0.22));
+  animation: queueButtonPulse 1.15s ease-in-out infinite;
 }
 
 .enterArenaBtn::before {
@@ -4182,6 +4187,20 @@ body.storeOpen {
     rgba(255, 198, 114, 0.64) 56%,
     rgba(255, 255, 255, 0) 68%
   );
+}
+
+.enterArenaBtn.isSearching::before,
+.enterArenaBtn.isCancelMode::before {
+  opacity: 0;
+  transform: translateX(-145%) skewX(-18deg);
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0) 28%,
+    rgba(255, 190, 190, 0.74) 46%,
+    rgba(255, 136, 136, 0.82) 54%,
+    rgba(255, 255, 255, 0) 70%
+  );
+  animation: queueSweep 5000ms linear infinite;
 }
 
 .enterArenaBtn::after {
@@ -4207,6 +4226,19 @@ body.storeOpen {
   filter: saturate(1.05);
 }
 
+.enterArenaBtn.isSearching::after,
+.enterArenaBtn.isCancelMode::after {
+  opacity: 0.84;
+  transform: translateY(0);
+  background: linear-gradient(
+    to top,
+    rgba(255, 66, 66, 0.74) 0%,
+    rgba(255, 130, 130, 0.44) 48%,
+    rgba(255, 130, 130, 0) 100%
+  );
+  animation: queueGlowBreath 1080ms ease-in-out infinite;
+}
+
 .enterArenaBtn:hover {
   transform: scale(1.04);
   filter:
@@ -4224,6 +4256,28 @@ body.storeOpen {
   opacity: 0.76;
   transform: translateY(0);
   filter: saturate(1.18) brightness(1.1);
+}
+
+.enterArenaBtn.isSearching:hover,
+.enterArenaBtn.isCancelMode:hover {
+  transform: scale(1.03);
+  filter:
+    brightness(1.04)
+    drop-shadow(0 0 16px rgba(255, 90, 90, 0.34))
+    drop-shadow(0 8px 18px rgba(255, 124, 124, 0.24));
+}
+
+.enterArenaBtn.isSearching:hover::before,
+.enterArenaBtn.isCancelMode:hover::before {
+  opacity: 0;
+  animation: queueSweep 5000ms linear infinite;
+}
+
+.enterArenaBtn.isSearching:hover::after,
+.enterArenaBtn.isCancelMode:hover::after {
+  opacity: 0.86;
+  animation: queueGlowBreath 1080ms ease-in-out infinite;
+  filter: none;
 }
 
 .enterArenaBtn:active {
@@ -4276,6 +4330,15 @@ body.storeOpen {
   animation: none;
 }
 
+.enterArenaBtn.isSearching .enterArenaText,
+.enterArenaBtn.isCancelMode .enterArenaText {
+  color: #ffe8e8;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.82),
+    0 0 12px rgba(255, 132, 132, 0.34);
+  animation: queueTextPulse 980ms ease-in-out infinite;
+}
+
 @keyframes enterArenaSweep {
   0% {
     transform: translateX(-145%) skewX(-18deg);
@@ -4304,6 +4367,54 @@ body.storeOpen {
       drop-shadow(0 6px 14px rgba(255, 179, 71, 0.18));
   }
 }
+
+@keyframes queueButtonPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.018);
+  }
+}
+
+@keyframes queueSweep {
+  0% {
+    transform: translateX(-145%) skewX(-18deg);
+    opacity: 0;
+  }
+  4% {
+    opacity: 0.86;
+  }
+  18% {
+    transform: translateX(145%) skewX(-18deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(145%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@keyframes queueGlowBreath {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes queueTextPulse {
+  0%,
+  100% {
+    letter-spacing: 0.06em;
+  }
+  50% {
+    letter-spacing: 0.085em;
+  }
+}
 .rewardRow {
   display: flex;
   gap: 6px;
@@ -4321,24 +4432,32 @@ body.storeOpen {
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.52);
 }
 
-.quickMatchCancelBtn {
-  border-radius: 999px;
-  border: 1px solid rgba(232, 128, 128, 0.5);
-  background: linear-gradient(180deg, rgba(84, 26, 28, 0.88), rgba(56, 17, 19, 0.92));
-  color: #ffe6e6;
-  font-size: 12px;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  font-weight: 700;
-  padding: 8px 18px;
-  cursor: pointer;
-  transition: border-color 180ms ease, filter 180ms ease, transform 180ms ease;
+.quickMatchStateText.isSearching {
+  animation: quickMatchStatePulse 920ms ease-in-out infinite;
 }
 
-.quickMatchCancelBtn:hover {
-  border-color: rgba(255, 162, 162, 0.75);
-  filter: brightness(1.06);
-  transform: translateY(-1px);
+@keyframes quickMatchStatePulse {
+  0%,
+  100% {
+    opacity: 0.78;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enterArenaBtn.isSearching,
+  .enterArenaBtn.isCancelMode,
+  .enterArenaBtn.isSearching::before,
+  .enterArenaBtn.isCancelMode::before,
+  .enterArenaBtn.isSearching::after,
+  .enterArenaBtn.isCancelMode::after,
+  .enterArenaBtn.isSearching .enterArenaText,
+  .enterArenaBtn.isCancelMode .enterArenaText,
+  .quickMatchStateText.isSearching {
+    animation: none;
+  }
 }
 
 .rewardRow .tag {

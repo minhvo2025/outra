@@ -657,24 +657,45 @@ function resolveQuickMatchSnapshot(explicitSnapshot = null) {
   return api.getQuickMatchState();
 }
 
+function getQuickMatchStatus(snapshot = null) {
+  const resolved = snapshot && typeof snapshot === 'object'
+    ? snapshot
+    : resolveQuickMatchSnapshot();
+  return String(resolved?.status || 'idle').trim().toLowerCase();
+}
+
+function setStartButtonQuickMatchState({ isLobbyState, isSearching, isMatched }) {
+  if (!startBtn) return;
+
+  const labelEl = startBtn.querySelector('.enterArenaText');
+  const inQueue = isLobbyState && isSearching;
+  const canInteract = isLobbyState && !isMatched;
+
+  startBtn.disabled = !canInteract;
+  startBtn.classList.toggle('isSearching', inQueue);
+  startBtn.classList.toggle('isCancelMode', inQueue);
+  startBtn.setAttribute('aria-busy', inQueue ? 'true' : 'false');
+  startBtn.setAttribute('aria-label', inQueue ? 'Cancel matchmaking queue' : 'Enter Arena');
+
+  const nextText = inQueue ? 'Cancel' : 'Enter Arena';
+  if (labelEl && labelEl.textContent !== nextText) {
+    labelEl.textContent = nextText;
+  } else if (!labelEl) {
+    startBtn.textContent = nextText;
+  }
+}
+
 function refreshLobbyQuickMatchUi(explicitSnapshot = null) {
   const snapshot = resolveQuickMatchSnapshot(explicitSnapshot);
-  const status = String(snapshot?.status || 'idle').trim().toLowerCase();
+  const status = getQuickMatchStatus(snapshot);
   const isSearching = status === 'searching';
   const isMatched = status === 'matched';
   const isLobbyState = gameState === 'lobby';
 
-  if (startBtn) {
-    startBtn.disabled = isLobbyState && isSearching;
-    startBtn.classList.toggle('isSearching', isSearching);
-  }
-
-  if (cancelQueueBtn) {
-    cancelQueueBtn.hidden = !isLobbyState || !isSearching;
-    cancelQueueBtn.disabled = !isLobbyState || !isSearching;
-  }
+  setStartButtonQuickMatchState({ isLobbyState, isSearching, isMatched });
 
   if (!quickMatchStateText) return;
+  quickMatchStateText.classList.toggle('isSearching', isLobbyState && isSearching);
   if (!isLobbyState) {
     quickMatchStateText.textContent = '';
     return;
@@ -710,10 +731,27 @@ function queueQuickMatchFromLobby() {
   }
 }
 
+function cancelQuickMatchFromLobby() {
+  const api = getQuickMatchApi();
+  if (!api || typeof api.cancelQuickMatch !== 'function') return false;
+  const canceled = api.cancelQuickMatch();
+  if (canceled === false) return false;
+  refreshLobbyQuickMatchUi({ status: 'idle' });
+  return true;
+}
+
 if (startBtn) {
   startBtn.addEventListener('click', (e) => {
     e.preventDefault();
     playMenuClickSound();
+    const status = getQuickMatchStatus();
+    if (status === 'searching') {
+      cancelQuickMatchFromLobby();
+      return;
+    }
+    if (status === 'matched') {
+      return;
+    }
     queueQuickMatchFromLobby();
   });
 }
@@ -728,19 +766,6 @@ if (draftRoomBtn) {
       api.cancelQuickMatch();
     }
     enterDraftRoom();
-  });
-}
-
-if (cancelQueueBtn) {
-  cancelQueueBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    playMenuClickSound();
-    const api = getQuickMatchApi();
-    if (api && typeof api.cancelQuickMatch === 'function') {
-      const canceled = api.cancelQuickMatch();
-      if (canceled === false) return;
-    }
-    refreshLobbyQuickMatchUi({ status: 'idle' });
   });
 }
 

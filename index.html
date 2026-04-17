@@ -7,6 +7,61 @@
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
   />
   <title>Outra</title>
+  <script>
+    (function earlyAuthUrlCleanup() {
+      const AUTH_TOKEN_KEYS = new Set([
+        'access_token',
+        'refresh_token',
+        'provider_token',
+        'provider_refresh_token'
+      ]);
+      const AUTH_ERROR_KEYS = new Set([
+        'error',
+        'error_code',
+        'error_description'
+      ]);
+
+      function trim(value) {
+        return String(value || '').trim();
+      }
+
+      try {
+        const { location, history, document } = window;
+        if (!location || !history || typeof history.replaceState !== 'function') return;
+
+        const hashParams = new URLSearchParams(trim(location.hash).replace(/^#/, ''));
+        const searchParams = new URLSearchParams(trim(location.search).replace(/^\?/, ''));
+        let hasTokenHash = false;
+        let hasErrorHash = false;
+        let changedSearch = false;
+
+        for (const key of AUTH_TOKEN_KEYS) {
+          if (hashParams.has(key)) {
+            hasTokenHash = true;
+            break;
+          }
+        }
+        for (const key of AUTH_ERROR_KEYS) {
+          if (hashParams.has(key)) hasErrorHash = true;
+          if (searchParams.has(key)) {
+            searchParams.delete(key);
+            changedSearch = true;
+          }
+        }
+
+        // Do not touch token hash early; Supabase must consume it first for successful magic links.
+        if (hasTokenHash) return;
+        if (!hasErrorHash && !changedSearch) return;
+        const nextSearch = searchParams.toString();
+        const nextUrl = `${trim(location.pathname) || '/'}${nextSearch ? `?${nextSearch}` : ''}`;
+        // Use replace navigation for error callbacks so the noisy hash URL is removed immediately.
+        // This intentionally does a one-time reload on invalid/expired magic-link callbacks.
+        location.replace(nextUrl);
+      } catch (_error) {
+        // Best-effort cleanup only.
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" type="image/png" href="/docs/art/logo.png" />
 </head>
@@ -472,7 +527,6 @@
               </button>
             </div>
             <div id="quickMatchStateText" class="quickMatchStateText" aria-live="polite"></div>
-            <button id="cancelQueueBtn" class="quickMatchCancelBtn" type="button" hidden>Cancel</button>
 
             <div class="rewardRow">
 
@@ -515,7 +569,7 @@
 
   <!-- Scripts: config first, main last -->
   <script src="js/config.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/vendor/supabase.js"></script>
   <script src="js/lib/supabase.js"></script>
   <script src="js/services/playerService.js"></script>
   <script src="js/rank-config.js"></script>

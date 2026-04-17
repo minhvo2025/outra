@@ -12,7 +12,99 @@
   const PENDING_AUTH_ACTION_STORAGE_KEY = 'outra_pending_auth_action_v1';
   const PENDING_AUTH_ACTION_MAX_AGE_MS = 20 * 60 * 1000;
   const AUTH_CALLBACK_PATH = '/';
-  const TEMP_NAME_PREFIXES = ['Traveler', 'Mage', 'Outrider', 'Invoker', 'Spark'];
+  const TEMP_NAME_PREFIXES = [
+    'Traveler',
+    'Mage',
+    'Outrider',
+    'Invoker',
+    'Spark',
+    'Warden',
+    'Ranger',
+    'Paladin',
+    'Rogue',
+    'Bard',
+    'Druid',
+    'Cleric',
+    'Warlock',
+    'Sorcerer',
+    'Alchemist',
+    'Arcanist',
+    'Templar',
+    'Sentinel',
+    'Dragoon',
+    'Berserker',
+    'Gladiator',
+    'Ravager',
+    'Reaper',
+    'Valkyrie',
+    'Nightblade',
+    'Spellweaver',
+    'Runesmith',
+    'Stormborn',
+    'Ironclad',
+    'Starseer',
+    'Sunstrider',
+    'Moonfang',
+    'Shadowkin',
+    'Dawnbringer',
+    'Duskblade',
+    'Emberlord',
+    'Frostwarden',
+    'Stoneguard',
+    'Wildheart',
+    'Riftwalker',
+    'Voidcaller',
+    'Ghostblade',
+    'Skyrunner',
+    'Flamebound',
+    'Oathkeeper',
+    'Windcaller',
+    'Bloodrune',
+    'Ashenborn',
+    'Brightspear',
+    'Darklance',
+    'Thornhelm',
+    'Goldcrest',
+    'Silveroak',
+    'Copperhand',
+    'Grimward',
+    'Ironwolf',
+    'Steelwing',
+    'Stormcloak',
+    'Mistwalker',
+    'Highwarden',
+    'Everdawn',
+    'Northstar',
+    'Southwind',
+    'Eastflame',
+    'Westguard',
+    'Seabreaker',
+    'Sandstrider',
+    'Wolfshade',
+    'Lionheart',
+    'Ravencrest',
+    'Hawkthorne',
+    'Foxshadow',
+    'Drakefang',
+    'Wyvernclaw',
+    'Phoenixash',
+    'Thunderborn',
+    'Lightspire',
+    'Darkspire',
+    'Moonwarden',
+    'Sunwarden',
+    'Firebrand',
+    'Icebound',
+    'Earthsong',
+    'Watershard',
+    'Skyforge',
+    'Runeblade',
+    'Soulkeeper',
+    'Fateweaver',
+    'Dreamwarden',
+    'Netherstorm',
+    'Aetherborn',
+  ];
 
   let initPromise = null;
   let identityUiBound = false;
@@ -51,10 +143,14 @@
 
   function isMissingLeaderboardRpcError(error) {
     const code = trimString(error?.code).toUpperCase();
-    const message = `${trimString(error?.message)} ${trimString(error?.hint)}`.toLowerCase();
+    const message = `${trimString(error?.message)} ${trimString(error?.details)} ${trimString(error?.hint)}`.toLowerCase();
+    const isAmbiguousUserIdReference = code === '42702'
+      && message.includes('user_id')
+      && message.includes('ambiguous');
     return code === 'PGRST202'
       || code === '42883'
       || code === 'PGRST204'
+      || isAmbiguousUserIdReference
       || message.includes('apply_leaderboard_match_result');
   }
 
@@ -81,7 +177,7 @@
     if (leaderboardFallbackLogged) return;
     leaderboardFallbackLogged = true;
     console.warn(
-      `${LOG_PREFIX} leaderboard fallback enabled (${reason}). Using ${LEADERBOARD_FALLBACK_TABLE} because ${LEADERBOARD_TABLE} is not available yet.`,
+      `${LOG_PREFIX} leaderboard fallback enabled (${reason}). Using ${LEADERBOARD_FALLBACK_TABLE} writes instead of ${LEADERBOARD_TABLE} RPC.`,
       error || ''
     );
   }
